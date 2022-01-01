@@ -17,16 +17,83 @@ end
 # ╔═╡ b29d2430-3950-4544-8daf-57be549a690f
 trials = 5
 
+# ╔═╡ bdbd896d-0761-4d30-82ab-928889953d3f
+pathprefix = "../ScalableHrlEs/csv_logs"
+
 # ╔═╡ 3163445d-ce5e-424a-961a-5ca03a34f177
 begin
 	# file = "../csv_logs/tune/push/cdist/AntPush_tune_cdist-2_"
-	gather_nohot_path = "../csv_logs/gather/tuned/nohot/AntGather_tuned_"
-	gather_onehot_path = "../csv_logs/gather/tuned/onehot/AntGather_tuned-onehot_"
-	gather_pretrained_path = "../csv_logs/gather/pretrained/AntGather-pretrained_pretrained_"
-	gather_10_path = "../csv_logs/gather/speedup/AntGather_10node_"
-	gather_5_path = "../csv_logs/gather/speedup/AntGather_5node_"
+	gather_nohot_path = "$pathprefix/gather/tuned/nohot/AntGather_tuned_"
+	gather_onehot_path = "$pathprefix/gather/tuned/onehot/AntGather_tuned-onehot_"
+	gather_pretrained_path = "$pathprefix/gather/pretrained/AntGather-pretrained_pretrained_"
 	
-	maze_path = "../csv_logs/maze/tuned/AntMaze_tuned_"
+	gather_10_path = "$pathprefix/gather/speedup/AntGather_10node_"
+	gather_5_path = "$pathprefix/gather/speedup/AntGather_5node_"
+	
+	maze_path = "$pathprefix/maze/tuned/AntMaze_tuned_"
+end
+
+# ╔═╡ 27ea31d5-52ab-4186-8859-48e912abbe07
+begin
+	gthr_tune_base_pth = "$pathprefix/gather/tune/AntGather_base_"
+	
+	gthr_tune_cd2_pth = "$pathprefix/gather/tune/AntGather_tune_cdist-2_"
+	gthr_tune_cd8_pth = "$pathprefix/gather/tune/AntGather_tune_cdist-8_"
+
+	gthr_tune_ep3_pth = "$pathprefix/gather/tune/AntGather_tune_eps-3_"
+	gthr_tune_ep10_pth = "$pathprefix/gather/tune/AntGather_tune_eps-10_"
+
+	gthr_tune_int10_pth = "$pathprefix/gather/tune/AntGather_tune_interval-10_"
+	gthr_tune_int100_pth = "$pathprefix/gather/tune/AntGather_tune_interval-100_"
+
+	gthr_tune_lr01_pth = "$pathprefix/gather/tune/AntGather_tune_lr-0.1_"
+	gthr_tune_lr0001_pth = "$pathprefix/gather/tune/AntGather_tune_lr-0.001_"
+
+	gthr_tune_ppg512_pth = "$pathprefix/gather/tune/AntGather_tune_ppg-512_"
+	gthr_tune_ppg1000_pth = "$pathprefix/gather/tune/AntGather_tune_ppg-1000_"
+
+	gthr_tune_sigma02_pth = "$pathprefix/gather/tune/AntGather_tune_sigma-0.2_"
+	gthr_tune_sigma0002_pth = "$pathprefix/gather/tune/AntGather_tune_sigma-0.002_"
+end
+
+# ╔═╡ a28bbacf-5fa1-4a60-9ac5-66ca96dd0765
+begin
+	psh_tune_base_pth = "$pathprefix/push/tune/AntPush_base_"
+	
+	psh_tune_cd2_pth = "$pathprefix/push/tune/AntPush_tune_cdist-2_"
+	psh_tune_cd8_pth = "$pathprefix/push/tune/AntPush_tune_cdist-8_"
+
+	psh_tune_ep3_pth = "$pathprefix/push/tune/AntPush_tune_eps-3_"
+	psh_tune_ep10_pth = "$pathprefix/push/tune/AntPush_tune_eps-10_"
+
+	psh_tune_int10_pth = "$pathprefix/push/tune/AntPush_tune_interval-10_"
+	psh_tune_int100_pth = "$pathprefix/push/tune/AntPush_tune_interval-100_"
+
+	psh_tune_lr01_pth = "$pathprefix/push/tune/AntPush_tune_lr-0.1_"
+	psh_tune_lr0001_pth = "$pathprefix/push/tune/AntPush_tune_lr-0.001_"
+
+	psh_tune_ppg512_pth = "$pathprefix/push/tune/AntPush_tune_ppg-512_"
+	psh_tune_ppg1000_pth = "$pathprefix/push/tune/AntPush_tune_ppg-1000_"
+
+	psh_tune_sigma02_pth = "$pathprefix/push/tune/AntPush_tune_sigma-0.2_"
+	psh_tune_sigma0002_pth = "$pathprefix/push/tune/AntPush_tune_sigma-0.002_"
+end
+
+# ╔═╡ 35dc88a2-9b9a-4d57-8036-ca198020276c
+struct TuneRun
+	base
+	cd2
+	cd8
+	ep3
+	ep10
+	int10
+	int100
+	lr01
+	lr0001
+	ppg512
+	ppg1000
+	sigma02
+	sigma0002
 end
 
 # ╔═╡ 23463959-ea89-4276-80a1-92cb3ff105b0
@@ -76,6 +143,84 @@ function readlog(f, trials, fix_gentime=false)
 	map(x->clean(x, fix_gentime), [DataFrame(CSV.File("$f$i.csv")) for i in trials])
 end
 
+# ╔═╡ ec291a04-df1a-4b4a-89e1-6e15d5c6b8d2
+begin
+	gthr_base_dfs = readlog(gthr_tune_base_pth, 0:2)
+	
+	gthr_cd2_dfs = readlog(gthr_tune_cd2_pth, 0:2)
+	gthr_cd8_dfs = readlog(gthr_tune_cd8_pth, 0:2)
+
+	gthr_ep3_dfs = readlog(gthr_tune_ep3_pth, 0:2)
+	gthr_ep10_dfs = readlog(gthr_tune_ep10_pth, 0:2)
+
+	gthr_int10_dfs = readlog(gthr_tune_int10_pth, 0:2)
+	gthr_int100_dfs = readlog(gthr_tune_int100_pth, 0:2)
+	
+	gthr_lr01_dfs = readlog(gthr_tune_lr01_pth, 0:2)
+	gthr_lr0001_dfs = readlog(gthr_tune_lr0001_pth, 0:2)
+
+	gthr_ppg512_dfs = readlog(gthr_tune_ppg512_pth, 0:2)
+	gthr_ppg1000_dfs = readlog(gthr_tune_ppg1000_pth, 1:2)  # todo 1 is broken
+
+	gthr_sigma02_dfs = readlog(gthr_tune_sigma02_pth, 0:2)
+	gthr_sigma0002_dfs = readlog(gthr_tune_sigma0002_pth, 0:2)
+
+	gather_tune = TuneRun(
+		gthr_base_dfs, 
+		gthr_cd2_dfs,
+		gthr_cd8_dfs,
+		gthr_ep3_dfs,
+		gthr_ep10_dfs,
+		gthr_int10_dfs,
+		gthr_int100_dfs,
+		gthr_lr01_dfs,
+		gthr_lr0001_dfs,
+		gthr_ppg512_dfs,
+		gthr_ppg1000_dfs,
+		gthr_sigma02_dfs,
+		gthr_sigma0002_dfs
+	)
+end
+
+# ╔═╡ 5aa5ddd3-e896-47e7-bdd1-effda634168e
+begin
+	psh_base_dfs = readlog(psh_tune_base_pth, 0:2)
+	
+	psh_cd2_dfs = readlog(psh_tune_cd2_pth, 0:2)
+	psh_cd8_dfs = readlog(psh_tune_cd8_pth, 0:2)
+
+	psh_ep3_dfs = readlog(psh_tune_ep3_pth, 0:2)
+	psh_ep10_dfs = readlog(psh_tune_ep10_pth, 1:2)
+
+	psh_int10_dfs = readlog(psh_tune_int10_pth, 0:2)
+	psh_int100_dfs = readlog(psh_tune_int100_pth, 0:2)
+	
+	psh_lr01_dfs = readlog(psh_tune_lr01_pth, 0:2)
+	psh_lr0001_dfs = readlog(psh_tune_lr0001_pth, 0:2)
+
+	psh_ppg512_dfs = readlog(psh_tune_ppg512_pth, 0:2)
+	psh_ppg1000_dfs = readlog(psh_tune_ppg1000_pth, 0:2)
+
+	psh_sigma02_dfs = readlog(psh_tune_sigma02_pth, 0:2)
+	psh_sigma0002_dfs = readlog(psh_tune_sigma0002_pth, 0:2)
+
+	push_tune = TuneRun(
+		psh_base_dfs, 
+		psh_cd2_dfs,
+		psh_cd8_dfs,
+		psh_ep3_dfs,
+		psh_ep10_dfs,
+		psh_int10_dfs,
+		psh_int100_dfs,
+		psh_lr01_dfs,
+		psh_lr0001_dfs,
+		psh_ppg512_dfs,
+		psh_ppg1000_dfs,
+		psh_sigma02_dfs,
+		psh_sigma0002_dfs
+	)
+end
+
 # ╔═╡ bed86641-3ef4-48f9-b27b-b7a98da0d2eb
 begin
 	gather_nohot_dfs = readlog(gather_nohot_path, 0:trials-1, true)
@@ -86,9 +231,6 @@ begin
 	
 	maze_dfs = readlog(maze_path, 0:9, true)
 end
-
-# ╔═╡ 44567d76-679d-4a80-9259-2c8304db2176
-nrow.(maze_dfs)
 
 # ╔═╡ 0b2d3f1c-3a78-4d7a-94dd-5eab9118faa2
 minlen(xs) = xs |> ys -> [length(y) for y in ys] |> minimum
@@ -188,6 +330,58 @@ end
 # ╔═╡ b6dd438c-4e57-4b52-a1f5-98d29f16acc6
 md"# Ant gather"
 
+# ╔═╡ fafa619c-8187-4ffe-a6ec-994957dfb7d4
+md"### Tune"
+
+# ╔═╡ 456f5fd5-ef9c-4691-9c6d-b8ec408d894e
+function plot_tune(exps, title_pref, save_pref)
+	# PPG -----------------------------------------------------------
+	plotexp(exps.base, "Time (h)", "Test Reward", "$title_pref Policies Per Generation", "256")
+	plotexp!(exps.ppg512, "Time (h)", "Test Reward", "512")
+	plotexp!(exps.ppg1000, "Time (h)", "Test Reward", "1000")
+
+	savefig("$save_pref/tune/tune_ppg")
+	
+	# EPS -----------------------------------------------------------
+	plotexp(exps.base, "Time (h)", "Test Reward", "$title_pref Episodes Per Policy", "5")
+	plotexp!(exps.ep3, "Time (h)", "Test Reward", "3")
+	plotexp!(exps.ep10, "Time (h)", "Test Reward", "10")
+
+	savefig("$save_pref/tune/tune_eps")
+	
+	# cdist ---------------------------------------------------------
+	plotexp(exps.base, "Time (h)", "Test Reward", "$title_pref Target Distance", "4")
+	plotexp!(exps.cd2, "Time (h)", "Test Reward", "2")
+	plotexp!(exps.cd8, "Time (h)", "Test Reward", "8")
+
+	savefig("$save_pref/tune/tune_cdist")
+	
+	# int -----------------------------------------------------------
+	plotexp(exps.base, "Time (h)", "Test Reward", "$title_pref Controller Interval", "25")
+	plotexp!(exps.int10, "Time (h)", "Test Reward", "10")
+	plotexp!(exps.int100, "Time (h)", "Test Reward", "100")
+
+	savefig("$save_pref/tune/tune_int")
+	
+	# lr ------------------------------------------------------------
+	plotexp(exps.base, "Time (h)", "Test Reward", "$title_pref Learning Rate", "0.01")
+	plotexp!(gather_tune.lr01, "Time (h)", "Test Reward", "0.1")
+	plotexp!(exps.lr0001, "Time (h)", "Test Reward", "0.001")
+
+	savefig("$save_pref/tune/tune_lr")
+
+	# σ -------------------------------------------------------------
+
+	plotexp(exps.base, "Time (h)", "Test Reward", "$title_pref Noise Standard Deviation (σ)", "0.02")
+	plotexp!(exps.sigma02, "Time (h)", "Test Reward", "0.2")
+	plotexp!(exps.sigma0002, "Time (h)", "Test Reward", "0.002")
+
+	savefig("$save_pref/tune/tune_sigma")
+end
+
+# ╔═╡ 97293ad9-4ef1-46ec-ba4c-ea593a66d449
+plot_tune(gather_tune, "Ant Gather:", "gather")
+
 # ╔═╡ b60af232-58db-488b-b48e-baf6cd412d15
 md"### Test reward"
 
@@ -265,6 +459,15 @@ begin
 
 	# savefig("maze test rew [steps]")
 end
+
+# ╔═╡ a16e058e-728e-4a24-a21a-aaafb5a6c183
+md"# Ant Push"
+
+# ╔═╡ 50f946d3-937e-448d-835e-e17e676e67c4
+md"### Tune"
+
+# ╔═╡ 868412e5-f725-415b-a7ab-d6bed0e15b13
+plot_tune(push_tune, "Ant Push:", "push")
 
 # ╔═╡ fbb132aa-4f45-4f22-9339-25511aaa840b
 md"##### Finding values"
@@ -1272,9 +1475,14 @@ version = "0.9.1+5"
 # ╔═╡ Cell order:
 # ╠═cd33cc66-1df7-11ec-102a-d5816d93431c
 # ╠═b29d2430-3950-4544-8daf-57be549a690f
+# ╠═bdbd896d-0761-4d30-82ab-928889953d3f
 # ╠═3163445d-ce5e-424a-961a-5ca03a34f177
+# ╠═27ea31d5-52ab-4186-8859-48e912abbe07
+# ╠═a28bbacf-5fa1-4a60-9ac5-66ca96dd0765
+# ╟─ec291a04-df1a-4b4a-89e1-6e15d5c6b8d2
+# ╟─5aa5ddd3-e896-47e7-bdd1-effda634168e
 # ╠═bed86641-3ef4-48f9-b27b-b7a98da0d2eb
-# ╠═44567d76-679d-4a80-9259-2c8304db2176
+# ╠═35dc88a2-9b9a-4d57-8036-ca198020276c
 # ╠═519e5b4f-d204-4f3a-b473-52e45ec796f4
 # ╠═23463959-ea89-4276-80a1-92cb3ff105b0
 # ╠═08ee1e2d-0f88-4692-b9d8-62301cb06aa9
@@ -1285,7 +1493,10 @@ version = "0.9.1+5"
 # ╠═b9f2c016-93e1-440d-88c3-3f30921de1bd
 # ╠═fa3f66c2-b52a-48fd-9e49-42e8815880fa
 # ╠═6832f9ac-5105-47fb-a817-c1e5ce5dc6b8
-# ╠═b6dd438c-4e57-4b52-a1f5-98d29f16acc6
+# ╟─b6dd438c-4e57-4b52-a1f5-98d29f16acc6
+# ╟─fafa619c-8187-4ffe-a6ec-994957dfb7d4
+# ╠═456f5fd5-ef9c-4691-9c6d-b8ec408d894e
+# ╠═97293ad9-4ef1-46ec-ba4c-ea593a66d449
 # ╟─b60af232-58db-488b-b48e-baf6cd412d15
 # ╠═ecb988c8-844b-4a69-9870-613398238f65
 # ╟─efca9de3-e1f8-47de-8c7f-47f9f6b72ba9
@@ -1298,6 +1509,9 @@ version = "0.9.1+5"
 # ╟─0bfb4725-966c-48a2-9efe-253355030ae8
 # ╟─0e47ea2c-0041-4209-89af-e6070ff2727f
 # ╠═ae589eef-898c-4c6f-957d-ccb240e13c55
+# ╟─a16e058e-728e-4a24-a21a-aaafb5a6c183
+# ╟─50f946d3-937e-448d-835e-e17e676e67c4
+# ╠═868412e5-f725-415b-a7ab-d6bed0e15b13
 # ╟─fbb132aa-4f45-4f22-9339-25511aaa840b
 # ╠═8d5baceb-f1e3-451a-92d5-cfabebaea4e7
 # ╠═a1cd331f-2d70-4802-8d76-7038268da1e7
