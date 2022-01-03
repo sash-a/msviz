@@ -79,6 +79,12 @@ begin
 	psh_tune_sigma0002_pth = "$pathprefix/push/tune/AntPush_tune_sigma-0.002_"
 end
 
+# ╔═╡ 4bab0152-d53f-4bb9-a38a-49930797c632
+begin 
+	hiro_maze_eval_pth = "$pathprefix/hiro/maze/eval1.csv"
+	hiro_maze_train_pth = "$pathprefix/hiro/maze/train1.csv"
+end
+
 # ╔═╡ 35dc88a2-9b9a-4d57-8036-ca198020276c
 struct TuneRun
 	base
@@ -94,6 +100,32 @@ struct TuneRun
 	ppg1000
 	sigma02
 	sigma0002
+end
+
+# ╔═╡ 8e03a713-5bb2-44c6-a61b-7fdbf7ea41a5
+function readhiro(f, trials)
+	dfs = []
+	for i in trials
+		eval = unstack(DataFrame(CSV.File("$f$i/eval.csv")), :step, :metric, :value)
+		train = unstack(DataFrame(CSV.File("$f$i/train.csv")), :step, :metric, :value, allowduplicates=true)
+
+		sps = mean(collect(skipmissing(train[!, "global_step/sec"])))
+
+		insertcols!(eval,       			  
+				    1,                		  
+				    :step_per_sec => [sps for _ in 1:nrow(eval)],
+		)
+		# eval[!, "step_per_sec"] .= sps
+
+		push!(dfs, eval)
+	end
+	dfs
+end
+
+# ╔═╡ 593931df-9fba-4548-ad2b-b48e8abec8ba
+begin
+	hiro_maze = readhiro("$pathprefix/hiro/maze/maze", 1:7)
+	"HIRO"
 end
 
 # ╔═╡ 23463959-ea89-4276-80a1-92cb3ff105b0
@@ -180,6 +212,7 @@ begin
 		gthr_sigma02_dfs,
 		gthr_sigma0002_dfs
 	)
+	"Gather tune"
 end
 
 # ╔═╡ 5aa5ddd3-e896-47e7-bdd1-effda634168e
@@ -219,6 +252,7 @@ begin
 		psh_sigma02_dfs,
 		psh_sigma0002_dfs
 	)
+	"Push tune"
 end
 
 # ╔═╡ bed86641-3ef4-48f9-b27b-b7a98da0d2eb
@@ -230,6 +264,7 @@ begin
 	gather_5_dfs = readlog(gather_5_path, 0:2)
 	
 	maze_dfs = readlog(maze_path, 0:9, true)
+	"SHES"
 end
 
 # ╔═╡ 0b2d3f1c-3a78-4d7a-94dd-5eab9118faa2
@@ -482,6 +517,22 @@ end
 begin
 	raw_xs = map(df->df[!, "Samples"], gather_onehot_dfs)
 	mean([x[end] for x in raw_xs])
+end
+
+# ╔═╡ 9c21c1e0-46d2-4647-880c-9206ad502c61
+md"# HIRO"
+
+# ╔═╡ 015d8f93-a60a-4d5e-a656-0c5e4a58e852
+# average_eval1_hrl_success
+begin
+	xs = [df.step * df.step_per_sec[1] for df in hiro_maze]
+	ys = vcat(
+		[fix_main_fit(df[!, "Reward/average_eval1_hrl_success"]) for df in hiro_maze],
+		[fix_main_fit(df[!, "Reward/average_eval2_hrl_success"]) for df in hiro_maze],
+		[fix_main_fit(df[!, "Reward/average_eval3_hrl_success"]) for df in hiro_maze]
+	)
+	
+	plot(xs,ys)
 end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -1476,14 +1527,17 @@ version = "0.9.1+5"
 # ╠═cd33cc66-1df7-11ec-102a-d5816d93431c
 # ╠═b29d2430-3950-4544-8daf-57be549a690f
 # ╠═bdbd896d-0761-4d30-82ab-928889953d3f
-# ╠═3163445d-ce5e-424a-961a-5ca03a34f177
-# ╠═27ea31d5-52ab-4186-8859-48e912abbe07
-# ╠═a28bbacf-5fa1-4a60-9ac5-66ca96dd0765
+# ╟─3163445d-ce5e-424a-961a-5ca03a34f177
+# ╟─27ea31d5-52ab-4186-8859-48e912abbe07
+# ╟─a28bbacf-5fa1-4a60-9ac5-66ca96dd0765
+# ╟─4bab0152-d53f-4bb9-a38a-49930797c632
 # ╟─ec291a04-df1a-4b4a-89e1-6e15d5c6b8d2
 # ╟─5aa5ddd3-e896-47e7-bdd1-effda634168e
-# ╠═bed86641-3ef4-48f9-b27b-b7a98da0d2eb
+# ╟─bed86641-3ef4-48f9-b27b-b7a98da0d2eb
+# ╟─593931df-9fba-4548-ad2b-b48e8abec8ba
 # ╠═35dc88a2-9b9a-4d57-8036-ca198020276c
 # ╠═519e5b4f-d204-4f3a-b473-52e45ec796f4
+# ╠═8e03a713-5bb2-44c6-a61b-7fdbf7ea41a5
 # ╠═23463959-ea89-4276-80a1-92cb3ff105b0
 # ╠═08ee1e2d-0f88-4692-b9d8-62301cb06aa9
 # ╠═0b2d3f1c-3a78-4d7a-94dd-5eab9118faa2
@@ -1515,5 +1569,7 @@ version = "0.9.1+5"
 # ╟─fbb132aa-4f45-4f22-9339-25511aaa840b
 # ╠═8d5baceb-f1e3-451a-92d5-cfabebaea4e7
 # ╠═a1cd331f-2d70-4802-8d76-7038268da1e7
+# ╟─9c21c1e0-46d2-4647-880c-9206ad502c61
+# ╠═015d8f93-a60a-4d5e-a656-0c5e4a58e852
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
