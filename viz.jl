@@ -294,10 +294,10 @@ end
 
 # ╔═╡ 9f9e14fe-8568-48c2-9106-4e265bc284d8
 begin
-	mze_base_dfs = readlog(mze_tune_base_pth, 0:2)
+	mze_base_dfs = readlog(mze_tune_base_pth, 0:9)
 	
-	mze_cd2_dfs = readlog(mze_tune_cd2_pth, 0:2)
-	mze_cd8_dfs = readlog(mze_tune_cd8_pth, 0:2)
+	mze_cd2_dfs = readlog(mze_tune_cd2_pth, 0:7)
+	mze_cd8_dfs = readlog(mze_tune_cd8_pth, 0:7)
 
 	mze_ep3_dfs = readlog(mze_tune_ep3_pth, 0:2)
 	mze_ep10_dfs = readlog(mze_tune_ep10_pth, 0:2)
@@ -395,8 +395,8 @@ begin
 	push_dfs = readlog(push_path, 0:4, fix_gentime=true)
 	push_pt_dfs = readlog(push_pretrain_path, 0:4)
 	push_ns_dfs = readlog(push_ns_path, 0:4, missing_gentime=true)
-	push_5node_dfs = readlog(push_5_node_path, 0:1)
-	# push_10node_dfs = readlog(push_10_node_path, 0:1)
+	push_5node_dfs = readlog(push_5_node_path, 0:2)
+	push_10node_dfs = readlog(push_10_node_path, 1:1)
 	"SHES"
 end
 
@@ -556,7 +556,7 @@ function plothiro!(dfs)
 
 	smooth_xs, smooth_ys, smooth_stdev = prep_data(xs, ys, .2)
 	
-	plot!(smooth_xs, smooth_ys, ribbon=smooth_stdev, fillalpha=.5, label="HIRO")
+	plot!(smooth_xs, smooth_ys, ribbon=smooth_stdev, fillalpha=.5, label="HIRO (ours)")
 end
 
 # ╔═╡ b6dd438c-4e57-4b52-a1f5-98d29f16acc6
@@ -566,7 +566,7 @@ md"# Ant gather"
 md"### Tune"
 
 # ╔═╡ 97293ad9-4ef1-46ec-ba4c-ea593a66d449
-plot_tune(gather_tune, "Ant Gather:", "gather")
+plot_tune(gather_tune, "Ant Gather:", "imgs/gather")
 
 # ╔═╡ b60af232-58db-488b-b48e-baf6cd412d15
 md"### Test reward"
@@ -583,12 +583,12 @@ begin
 	plotexp!(gather_onehot_dfs, "Samples", "Test Reward", "SHES one-hot")
 
 	gather_other_xs = [0, 4e9]
-	plot!(gather_other_xs, [3.02, 3.02], label="HIRO")
+	plot!(gather_other_xs, [3.02, 3.02], label="HIRO (theirs)")
 	plot!(gather_other_xs, [0.85, 0.85], label="FuN")
 	plot!(gather_other_xs, [1.92, 1.92], label="SNN4HRL")
 	plot!(gather_other_xs, [1.42, 1.42], label="VIME")
 
-	# savefig("gather test rew [steps]")
+	savefig("imgs/gather/gather-tr-steps")
 end
 
 # ╔═╡ 0fa2bbcd-0b9e-4f79-8679-0e7d698d0068
@@ -601,12 +601,12 @@ begin
 	plotexp!(gather_10_dfs, "Time (h)", "Test Reward", "SHES 240 cores")
 
 	gather_other_xs2 = [0, 24]
-	plot!(gather_other_xs2, [3.02, 3.02], label="HIRO")
+	plot!(gather_other_xs2, [3.02, 3.02], label="HIRO (theirs)")
 	plot!(gather_other_xs2, [0.85, 0.85], label="FuN")
 	plot!(gather_other_xs2, [1.92, 1.92], label="SNN4HRL")
 	plot!(gather_other_xs2, [1.42, 1.42], label="VIME")
 
-	# savefig("gather test rew [time]")
+	savefig("imgs/gather/gather-tr-time")
 end
 
 # ╔═╡ efca9de3-e1f8-47de-8c7f-47f9f6b72ba9
@@ -619,10 +619,8 @@ begin
 	plotexp(gather_nohot_dfs, "Time (h)", "Test Reward", t4, "SHES")
 	plotexp!(gather_pretrained_dfs, "Time (h)", "Test Reward", "Pretrained")
 	plotexp!(gather_ns_dfs, "Time (h)", "Test Reward", "Novelty")
-
-	# TODO get ns time working
 	
-	# savefig("gather pretrained")
+	savefig("imgs/gather/gather-pt-ns")
 end
 
 # ╔═╡ 9c6878e0-741d-4030-9d4a-94fa40184221
@@ -637,19 +635,11 @@ begin
 	plotexp!(gather_ns_dfs, "Time (h)", "Mean Primitive Reward", "NS")
 	plotexp!(gather_pretrained_dfs, "Time (h)", "Mean Primitive Reward", "Pretrain")
 
-	# savefig("gather prim train rew")
+	savefig("imgs/gather/gather-prim")
 end
 
 # ╔═╡ 379ac95f-6d0a-446a-9dec-24135d79ea2c
 md"### Speed up"
-
-# ╔═╡ 64dcdbd6-1184-4fb5-a84e-0b718dfb9a46
-begin
-	t6 = "Ant Gather: Test Reward comparison with differing number of processors"
-	plotexp(gather_nohot_dfs, "Time (h)", "Test Reward", t1, "48")
-	plotexp!(gather_5_dfs, "Time (h)", "Test Reward", "120")
-	plotexp!(gather_10_dfs, "Time (h)", "Test Reward", "240")
-end
 
 # ╔═╡ e4cc1434-ef87-43f0-80c9-e84c9690dda5
 mean_gt(dfs) = mean(map(df -> mean(df.gen_time), dfs))
@@ -673,11 +663,11 @@ begin
 	plotexp(mx[mcutoff], my[mcutoff], mstd[mcutoff], "Samples", "Test Reward", t2, "SHES", :topright)
 
 	maze_other_xs = [0, 8e9] 
-	plot!(maze_other_xs, [0.99,0.99], label="HIRO")
+	plot!(maze_other_xs, [0.99,0.99], label="HIRO (theirs)")
 	plot!(maze_other_xs, [0.16, 0.16], label="FuN")
 	plot!(maze_other_xs, [0, 0], label="SNN4HRL+VIME")
 
-	# savefig("maze test rew [steps]")
+	savefig("imgs/maze/maze-tr-steps")
 end
 
 # ╔═╡ b48b0893-266b-4937-af92-16045dcec171
@@ -694,7 +684,7 @@ begin
 	plot!(maze_other_xs2, [0.16, 0.16], label="FuN")
 	plot!(maze_other_xs2, [0, 0], label="SNN4HRL+VIME")
 
-	# savefig("maze test rew [time]")
+	savefig("imgs/maze/maze-tr-time")
 end
 
 # ╔═╡ 67939190-1a19-45f9-a27f-01021b497c07
@@ -708,7 +698,7 @@ begin
 	plotexp!(maze_pt_dfs, "Time (h)", "Mean Primitive Reward", "PT")
 	plotexp!(maze_ns_dfs, "Time (h)", "Mean Primitive Reward", "NS")
 	
-	# savefig("maze prim train rew")
+	savefig("imgs/maze/maze-prim")
 end
 
 # ╔═╡ 4c4c7482-867b-474c-abea-8dc9ea82c890
@@ -722,25 +712,17 @@ begin
 	plotexp!(maze_pt_dfs, "Time (h)", "Test Reward", "Pretrained")
 	plotexp!(maze_ns_dfs, "Time (h)", "Test Reward", "NS")
 	
-	# savefig("maze pretrained")
+	savefig("imgs/maze/maze-pt-ns")
 end
 
 # ╔═╡ 09bfe3f2-3a07-4701-a169-76d6b12490ba
 md"### Speedup"
 
-# ╔═╡ c054a6ca-d352-4eb4-912b-9ed55b0c8b59
-begin
-	t10 = "Ant Maze: Test Reward with differing number of processors"
-	plotexp(maze_dfs, "Time (h)", "Test Reward", t10, "48")
-	plotexp!(maze_5node_dfs, "Time (h)", "Test Reward", "120")
-	plotexp!(maze_10node_dfs, "Time (h)", "Test Reward", "240")
-end
-
 # ╔═╡ b3c916f1-fed1-4ce7-a0cc-84b16877dcb3
 md"### Tune"
 
 # ╔═╡ e23d4c2f-620f-4fc4-b56a-0a285639e4ea
-plot_tune(maze_tune, "Ant Maze:", "maze")
+plot_tune(maze_tune, "Ant Maze:", "imgs/maze")
 
 # ╔═╡ a16e058e-728e-4a24-a21a-aaafb5a6c183
 md"# Ant Push"
@@ -752,15 +734,15 @@ md"### Test Reward"
 begin
 	t11 = "Ant Push: Test Reward Per Environmental Steps"
 
-	all_push_dfs = vcat(push_dfs, push_5node_dfs)
-	plotexp(all_push_dfs, "Samples", "Test Reward", t11, "SHES")
+	all_push_dfs = vcat(push_dfs, push_5node_dfs, push_10node_dfs)
+	plotexp(all_push_dfs, "Samples", "Test Reward", t11, "SHES (any processors)")
 	
-	push_other_xs = [0, 6.4e9]
+	push_other_xs = [0, 8.45e9]
 	plot!(push_other_xs, [0.92,0.92], label="HIRO")
 	plot!(push_other_xs, [0.56, 0.56], label="FuN")
 	plot!(push_other_xs, [0.02, 0.02], label="SNN4HRL+VIME")
 
-	# savefig("push test rew [steps]")
+	savefig("imgs/push/push-tr-steps")
 end
 
 # ╔═╡ 947dcf8c-3799-47d7-9d78-1058e111ea60
@@ -775,11 +757,12 @@ begin
 	plotexp!(x[cutoff],y[cutoff],stdev[cutoff], "Time (h)", "Test Reward", "SHES 120 cores")
 
 	plothiro!(hiro_push)
-	push_other_xs_t = [0, 11.98] 
+	push_other_xs_t = [0, 11.98]
+	plot!(push_other_xs_t, [0.92,0.92], label="HIRO")
 	plot!(push_other_xs_t, [0.16, 0.16], label="FuN")
 	plot!(push_other_xs_t, [0, 0], label="SNN4HRL+VIME")
 
-	# savefig("push test rew [time]")
+	savefig("imgs/push/push-tr-time")
 end
 
 # ╔═╡ eea5569f-cea7-493b-965d-91bab81dee7c
@@ -793,7 +776,7 @@ begin
 	plotexp!(push_pt_dfs, "Samples", "Test Reward", "Pretrained")
 	plotexp!(push_ns_dfs, "Samples", "Test Reward", "NS")
 	
-	# savefig("push pretrained")
+	savefig("imgs/push/push-ns-pt")
 end
 
 # ╔═╡ 07861635-0ce0-4315-9259-91956e6f5f1a
@@ -807,7 +790,7 @@ begin
 	plotexp!(push_pt_dfs, "Time (h)", "Mean Primitive Reward", "SHES")
 	plotexp!(push_ns_dfs, "Time (h)", "Mean Primitive Reward", "SHES")
 	
-	# savefig("maze prim train rew")
+	savefig("imgs/push/push-prim")
 end
 
 # ╔═╡ bccedaad-c533-4dbb-90f8-79140e5af04b
@@ -817,7 +800,7 @@ md"### Speedup"
 md"### Tune"
 
 # ╔═╡ 868412e5-f725-415b-a7ab-d6bed0e15b13
-plot_tune(push_tune, "Ant Push:", "push")
+plot_tune(push_tune, "Ant Push:", "imgs/push")
 
 # ╔═╡ fbb132aa-4f45-4f22-9339-25511aaa840b
 md"##### Scratch"
@@ -1873,7 +1856,6 @@ version = "0.9.1+5"
 # ╟─9c6878e0-741d-4030-9d4a-94fa40184221
 # ╠═ca002d4f-666b-4126-a94f-b664113086d3
 # ╟─379ac95f-6d0a-446a-9dec-24135d79ea2c
-# ╠═64dcdbd6-1184-4fb5-a84e-0b718dfb9a46
 # ╠═e4cc1434-ef87-43f0-80c9-e84c9690dda5
 # ╟─0bfb4725-966c-48a2-9efe-253355030ae8
 # ╟─0e47ea2c-0041-4209-89af-e6070ff2727f
@@ -1884,7 +1866,6 @@ version = "0.9.1+5"
 # ╟─4c4c7482-867b-474c-abea-8dc9ea82c890
 # ╠═6158877d-4494-44d0-836d-81829ae391bf
 # ╟─09bfe3f2-3a07-4701-a169-76d6b12490ba
-# ╠═c054a6ca-d352-4eb4-912b-9ed55b0c8b59
 # ╟─b3c916f1-fed1-4ce7-a0cc-84b16877dcb3
 # ╠═e23d4c2f-620f-4fc4-b56a-0a285639e4ea
 # ╟─a16e058e-728e-4a24-a21a-aaafb5a6c183
