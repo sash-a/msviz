@@ -22,15 +22,27 @@ pathprefix = "../ScalableHrlEs/csv_logs"
 
 # ╔═╡ 3163445d-ce5e-424a-961a-5ca03a34f177
 begin
-	# file = "../csv_logs/tune/push/cdist/AntPush_tune_cdist-2_"
+	# Gather
 	gather_nohot_path = "$pathprefix/gather/tuned/nohot/AntGather_tuned_"
 	gather_onehot_path = "$pathprefix/gather/tuned/onehot/AntGather_tuned-onehot_"
-	gather_pretrained_path = "$pathprefix/gather/pretrained/AntGather-pretrained_pretrained_"
-	
-	gather_10_path = "$pathprefix/gather/speedup/AntGather_10node_"
+	gather_pt_path = "$pathprefix/gather/pretrained/AntGather-pretrained_pretrained_"
+	gather_ns_path = "$pathprefix/gather/ns/AntGather-ns-endposbehv_ns_"
 	gather_5_path = "$pathprefix/gather/speedup/AntGather_5node_"
-	
+	gather_10_path = "$pathprefix/gather/speedup/AntGather_10node_"
+
+	# Maze
 	maze_path = "$pathprefix/maze/tuned/AntMaze_tuned_"
+	maze_pretrain_path = "$pathprefix/maze/pretrained/AntMaze-pre-fix_pt_"
+	maze_ns_path = "$pathprefix/maze/ns/AntMaze-ns-endposbehv_ns_"
+	maze_5_node_path = "$pathprefix/maze/speedup/AntMaze_5node_"
+	maze_10_node_path = "$pathprefix/maze/speedup/AntMaze_10node_"
+
+	# Push
+	push_path = "$pathprefix/push/tuned/AntPush_tuned_"
+	push_pretrain_path = "$pathprefix/push/pretrained/AntPush-pre-fix_pt_"
+	push_ns_path = "$pathprefix/push/ns/AntPush-ns-endposbehv_ns_"
+	push_5_node_path = "$pathprefix/push/speedup/AntPush_5node_"
+	push_10_node_path = "$pathprefix/push/speedup/AntPush_10node_"
 end
 
 # ╔═╡ 27ea31d5-52ab-4186-8859-48e912abbe07
@@ -54,6 +66,29 @@ begin
 
 	gthr_tune_sigma02_pth = "$pathprefix/gather/tune/AntGather_tune_sigma-0.2_"
 	gthr_tune_sigma0002_pth = "$pathprefix/gather/tune/AntGather_tune_sigma-0.002_"
+end
+
+# ╔═╡ 1341a522-35b1-4d12-acc5-5455cff02992
+begin
+	mze_tune_base_pth = "$pathprefix/maze/tune/AntMaze_base_"
+	
+	mze_tune_cd2_pth = "$pathprefix/maze/tune/AntMaze_tune_cdist-2_"
+	mze_tune_cd8_pth = "$pathprefix/maze/tune/AntMaze_tune_cdist-8_"
+
+	mze_tune_ep3_pth = "$pathprefix/maze/tune/AntMaze_tune_eps-3_"
+	mze_tune_ep10_pth = "$pathprefix/maze/tune/AntMaze_tune_eps-10_"
+
+	mze_tune_int10_pth = "$pathprefix/maze/tune/AntMaze_tune_interval-10_"
+	mze_tune_int100_pth = "$pathprefix/maze/tune/AntMaze_tune_interval-100_"
+
+	mze_tune_lr01_pth = "$pathprefix/maze/tune/AntMaze_tune_lr-0.1_"
+	mze_tune_lr0001_pth = "$pathprefix/maze/tune/AntMaze_tune_lr-0.001_"
+
+	mze_tune_ppg512_pth = "$pathprefix/maze/tune/AntMaze_tune_ppg-512_"
+	mze_tune_ppg1000_pth = "$pathprefix/maze/tune/AntMaze_tune_ppg-1000_"
+
+	mze_tune_sigma02_pth = "$pathprefix/maze/tune/AntMaze_tune_sigma-0.2_"
+	mze_tune_sigma0002_pth = "$pathprefix/maze/tune/AntMaze_tune_sigma-0.002_"
 end
 
 # ╔═╡ a28bbacf-5fa1-4a60-9ac5-66ca96dd0765
@@ -102,32 +137,6 @@ struct TuneRun
 	sigma0002
 end
 
-# ╔═╡ 8e03a713-5bb2-44c6-a61b-7fdbf7ea41a5
-function readhiro(f, trials)
-	dfs = []
-	for i in trials
-		eval = unstack(DataFrame(CSV.File("$f$i/eval.csv")), :step, :metric, :value)
-		train = unstack(DataFrame(CSV.File("$f$i/train.csv")), :step, :metric, :value, allowduplicates=true)
-
-		sps = mean(collect(skipmissing(train[!, "global_step/sec"])))
-
-		insertcols!(eval,       			  
-				    1,                		  
-				    :step_per_sec => [sps for _ in 1:nrow(eval)],
-		)
-		# eval[!, "step_per_sec"] .= sps
-
-		push!(dfs, eval)
-	end
-	dfs
-end
-
-# ╔═╡ 593931df-9fba-4548-ad2b-b48e8abec8ba
-begin
-	hiro_maze = readhiro("$pathprefix/hiro/maze/maze", 1:7)
-	"HIRO"
-end
-
 # ╔═╡ 23463959-ea89-4276-80a1-92cb3ff105b0
 function fix_main_fit(xs)  # pins main_fit at prev max
 	for (i,x) in enumerate(xs)
@@ -136,21 +145,88 @@ function fix_main_fit(xs)  # pins main_fit at prev max
 	xs
 end
 
+# ╔═╡ 0b2d3f1c-3a78-4d7a-94dd-5eab9118faa2
+minlen(xs) = xs |> ys -> [length(y) for y in ys] |> minimum
+
+# ╔═╡ f91781de-3d67-48f5-b82a-90d91e105812
+function matrixize(xs)
+	ml = minlen(xs)
+	xs = [x[1:ml] for x in xs]
+	hcat(xs...)
+end
+
+# ╔═╡ 7d484f3b-57b6-4ea7-84d6-91be70916021
+function revcumsum(vec)
+	result = [first(vec)]
+	for i in 2:length(vec) 
+		push!(result, vec[i]-vec[i-1]) 
+	end
+	result
+end
+
+# ╔═╡ 8e03a713-5bb2-44c6-a61b-7fdbf7ea41a5
+function readhiro(f, trials)
+	dfs = []
+	for i in trials
+		stacked_df = DataFrame(CSV.File("$f$i/eval.csv"))
+				
+		df = unstack(stacked_df, :step, :metric, :value, allowduplicates=true)
+		walltimes = stacked_df[1:nrow(df), :walltime]
+
+		# train = unstack(DataFrame(CSV.File("$f$i/train.csv")), :step, :metric, :value, allowduplicates=true)
+
+		# sps = mean(collect(skipmissing(train[!, "global_step/sec"])))
+
+		# insertcols!(eval,       			  
+		# 		    1,                		  
+		# 		    :step_per_sec => [sps for _ in 1:nrow(eval)],
+		# )
+
+		walltimes = walltimes .- first(walltimes)
+		insertcols!(df, 1, :time => revcumsum(walltimes))
+		insertcols!(df, 1, :cumtime => walltimes)
+		delete!(df, [nrow(df)])  # remove last row
+
+
+		# eval[!, "step_per_sec"] .= sps
+
+		df = dropmissing(df)
+		
+		push!(dfs, df)
+	end
+	dfs
+end
+
+# ╔═╡ 593931df-9fba-4548-ad2b-b48e8abec8ba
+begin
+	hiro_maze = readhiro("$pathprefix/hiro/maze/maze", 1:10)
+	hiro_push = readhiro("$pathprefix/hiro/push/push", 1:10)
+	"HIRO"
+end
+
 # ╔═╡ 08ee1e2d-0f88-4692-b9d8-62301cb06aa9
-function clean(df, fix_gentime=false)
-	df.metric = map(x-> x[2:end], df.metric) # removing preceding forward slash
-	df = unstack(df, :step, :metric, :value) # rotating df
+function clean(stacked_df, fix_gentime=false, missing_gentime=false)
+	# removing preceding forward slash
+	stacked_df.metric = map(x-> x[2:end], stacked_df.metric) 
 	
-	if fix_gentime # fixing gen time logging bug
+	df = unstack(stacked_df, :step, :metric, :value) # rotating df
+	
+	if fix_gentime # fixing gen time logging bug - logged gentime in second half of df
 		ndata = floor(Int32, (nrow(df) - 1) / 2)
 		@show ndata
 		df[1:ndata, :gen_time_s] = df[ndata+1:ndata*2, :gen_time_s]  
 		df = df[1:ndata, names(df)]  # cutting off at half the gens
 	end
 
-	insertcols!(df, 4, :gen_time => df.gen_time_s)
+	if missing_gentime
+		walltimes = stacked_df[1:nrow(df), :walltime]
+		walltimes = walltimes .- first(walltimes)
+		insertcols!(df, 4, :gen_time_s => revcumsum(walltimes))
+	end
 	
+	insertcols!(df, 4, :gen_time => df.gen_time_s)
 	df.gen_time_s = cumsum(df.gen_time_s) ./ 60 ./ 60
+	
 	df.main_fitness = fix_main_fit(df.main_fitness)
 	df.total_steps = df.total_steps
 
@@ -165,14 +241,15 @@ function clean(df, fix_gentime=false)
 	    )
 	)
 
+	delete!(df, [nrow(df)])
 	dropmissing!(df)
 
 	df
 end
 
 # ╔═╡ 519e5b4f-d204-4f3a-b473-52e45ec796f4
-function readlog(f, trials, fix_gentime=false)
-	map(x->clean(x, fix_gentime), [DataFrame(CSV.File("$f$i.csv")) for i in trials])
+function readlog(f, trials; fix_gentime=false, missing_gentime=false)
+	map(x->clean(x, fix_gentime, missing_gentime), [DataFrame(CSV.File("$f$i.csv")) for i in trials])
 end
 
 # ╔═╡ ec291a04-df1a-4b4a-89e1-6e15d5c6b8d2
@@ -192,7 +269,7 @@ begin
 	gthr_lr0001_dfs = readlog(gthr_tune_lr0001_pth, 0:2)
 
 	gthr_ppg512_dfs = readlog(gthr_tune_ppg512_pth, 0:2)
-	gthr_ppg1000_dfs = readlog(gthr_tune_ppg1000_pth, 1:2)  # todo 1 is broken
+	gthr_ppg1000_dfs = readlog(gthr_tune_ppg1000_pth, 0:2)  # todo 1 is broken
 
 	gthr_sigma02_dfs = readlog(gthr_tune_sigma02_pth, 0:2)
 	gthr_sigma0002_dfs = readlog(gthr_tune_sigma0002_pth, 0:2)
@@ -215,6 +292,46 @@ begin
 	"Gather tune"
 end
 
+# ╔═╡ 9f9e14fe-8568-48c2-9106-4e265bc284d8
+begin
+	mze_base_dfs = readlog(mze_tune_base_pth, 0:2)
+	
+	mze_cd2_dfs = readlog(mze_tune_cd2_pth, 0:2)
+	mze_cd8_dfs = readlog(mze_tune_cd8_pth, 0:2)
+
+	mze_ep3_dfs = readlog(mze_tune_ep3_pth, 0:2)
+	mze_ep10_dfs = readlog(mze_tune_ep10_pth, 0:2)
+
+	mze_int10_dfs = readlog(mze_tune_int10_pth, 0:2)
+	mze_int100_dfs = readlog(mze_tune_int100_pth, 0:2)
+	
+	mze_lr01_dfs = readlog(mze_tune_lr01_pth, 0:2)
+	mze_lr0001_dfs = readlog(mze_tune_lr0001_pth, 0:2)
+
+	mze_ppg512_dfs = readlog(mze_tune_ppg512_pth, 0:2)
+	mze_ppg1000_dfs = readlog(mze_tune_ppg1000_pth, 0:2)  # todo 1 is broken
+
+	mze_sigma02_dfs = readlog(mze_tune_sigma02_pth, 0:2)
+	mze_sigma0002_dfs = readlog(mze_tune_sigma0002_pth, 0:2)
+
+	maze_tune = TuneRun(
+		mze_base_dfs, 
+		mze_cd2_dfs,
+		mze_cd8_dfs,
+		mze_ep3_dfs,
+		mze_ep10_dfs,
+		mze_int10_dfs,
+		mze_int100_dfs,
+		mze_lr01_dfs,
+		mze_lr0001_dfs,
+		mze_ppg512_dfs,
+		mze_ppg1000_dfs,
+		mze_sigma02_dfs,
+		mze_sigma0002_dfs
+	)
+	"Maze tune"
+end
+
 # ╔═╡ 5aa5ddd3-e896-47e7-bdd1-effda634168e
 begin
 	psh_base_dfs = readlog(psh_tune_base_pth, 0:2)
@@ -223,7 +340,7 @@ begin
 	psh_cd8_dfs = readlog(psh_tune_cd8_pth, 0:2)
 
 	psh_ep3_dfs = readlog(psh_tune_ep3_pth, 0:2)
-	psh_ep10_dfs = readlog(psh_tune_ep10_pth, 1:2)
+	psh_ep10_dfs = readlog(psh_tune_ep10_pth, 0:2)
 
 	psh_int10_dfs = readlog(psh_tune_int10_pth, 0:2)
 	psh_int100_dfs = readlog(psh_tune_int100_pth, 0:2)
@@ -257,24 +374,30 @@ end
 
 # ╔═╡ bed86641-3ef4-48f9-b27b-b7a98da0d2eb
 begin
-	gather_nohot_dfs = readlog(gather_nohot_path, 0:trials-1, true)
+	# GATHER
+	gather_nohot_dfs = readlog(gather_nohot_path, 0:trials-1, fix_gentime=true)
 	gather_onehot_dfs = readlog(gather_onehot_path, 0:trials-1)
-	gather_pretrained_dfs = readlog(gather_pretrained_path, 0:4)
+	
+	gather_pretrained_dfs = readlog(gather_pt_path, 0:4)
+	gather_ns_dfs = readlog(gather_ns_path, 0:4, missing_gentime=true)
+	
 	gather_10_dfs = readlog(gather_10_path, 0:2)
 	gather_5_dfs = readlog(gather_5_path, 0:2)
 	
-	maze_dfs = readlog(maze_path, 0:9, true)
+	# MAZE
+	maze_dfs = readlog(maze_path, 0:4, fix_gentime=true)
+	maze_pt_dfs = readlog(maze_pretrain_path, 0:4)
+	maze_ns_dfs = readlog(maze_ns_path, 0:4, missing_gentime=true)
+	maze_5node_dfs = readlog(maze_5_node_path, 0:2)
+	maze_10node_dfs = readlog(maze_10_node_path, 0:1)
+
+	# PUSH
+	push_dfs = readlog(push_path, 0:4, fix_gentime=true)
+	push_pt_dfs = readlog(push_pretrain_path, 0:4)
+	push_ns_dfs = readlog(push_ns_path, 0:4, missing_gentime=true)
+	push_5node_dfs = readlog(push_5_node_path, 0:1)
+	# push_10node_dfs = readlog(push_10_node_path, 0:1)
 	"SHES"
-end
-
-# ╔═╡ 0b2d3f1c-3a78-4d7a-94dd-5eab9118faa2
-minlen(xs) = xs |> ys -> [length(y) for y in ys] |> minimum
-
-# ╔═╡ f91781de-3d67-48f5-b82a-90d91e105812
-function matrixize(xs)
-	ml = minlen(xs)
-	xs = [x[1:ml] for x in xs]
-	hcat(xs...)
 end
 
 # ╔═╡ 22594eef-9489-4d68-9090-f4958e219b4f
@@ -307,11 +430,8 @@ function mean_interp(dfs, x_ax, y_ax; inv=false)
 	end
 end
 
-# ╔═╡ b9f2c016-93e1-440d-88c3-3f30921de1bd
-function prep_data(dfs, x_ax, y_ax, smoothness)
-	raw_xs = map(df->df[!, x_ax], dfs)
-	raw_ys = map(df->df[!, y_ax], dfs)
-	
+# ╔═╡ fc226d0f-5c1b-4eb8-a725-4b45d7151c97
+function prep_data(raw_xs, raw_ys, smoothness)
 	itps = [LinearInterpolation(raw_x, raw_y, extrapolation_bc=Line()) for (raw_x, raw_y) in zip(raw_xs, raw_ys)]
 
 	mn = 0
@@ -322,7 +442,6 @@ function prep_data(dfs, x_ax, y_ax, smoothness)
 	ys = matrixize([[itp(x) for x in xs] for itp in itps])
 
 	stddev = vec(std(ys, dims=2))
-	@show stddev[end]
 	mean_y = vec(mean(ys, dims=2))
 
 	_, smooth_y = smooth(xs, mean_y, smoothness)
@@ -331,42 +450,50 @@ function prep_data(dfs, x_ax, y_ax, smoothness)
 	xs, smooth_y, smooth_stdev
 end
 
-# ╔═╡ fa3f66c2-b52a-48fd-9e49-42e8815880fa
-function plotexp(dfs, x_ax, y_ax, title, label)
-	x,y,stdev = prep_data(dfs, x_ax, y_ax, 0.2)
+# ╔═╡ b9f2c016-93e1-440d-88c3-3f30921de1bd
+function prep_data(dfs, x_ax, y_ax, smoothness)
+	raw_xs = map(df->df[!, x_ax], dfs)
+	raw_ys = map(df->df[!, y_ax], dfs)
 	
+	prep_data(raw_xs, raw_ys, smoothness)
+end
+
+# ╔═╡ 468a639c-8a6c-417e-bac6-29c770a640f1
+function plotexp(x,y,stdev, x_ax, y_ax, title, label, legendpos=:bottomright)
 	plot(x, 
 		y, 
 		ribbon=stdev, 
 		# fillalpha=.5, 
 		title=title, 
 		label=label, 
-		legend=:topleft,
+		legend=legendpos,
 		dpi=500
 	)
-
 	xlabel!(x_ax)
 	ylabel!(y_ax)
+end
+
+# ╔═╡ c4460ecb-31a8-439a-b7d7-3f08068926f0
+function plotexp!(x, y, stdev, xtype, field, label)
+	plot!(x, 
+			y, 
+			ribbon=stdev, 
+			fillalpha=0.5, 
+			label=label, 
+		)
+end
+
+# ╔═╡ fa3f66c2-b52a-48fd-9e49-42e8815880fa
+function plotexp(dfs, x_ax, y_ax, title, label, legendpos=:bottomright)
+	x,y,stdev = prep_data(dfs, x_ax, y_ax, 0.2)
+	plotexp(x,y,stdev,x_ax, y_ax, title, label, legendpos)
 end
 
 # ╔═╡ 6832f9ac-5105-47fb-a817-c1e5ce5dc6b8
 function plotexp!(dfs, xtype, field, label)
 	x,y,stdev = prep_data(dfs, xtype, field, 0.2)
-	println(size(y))
-	
-	plot!(x, 
-		y, 
-		ribbon=stdev, 
-		fillalpha=0.5, 
-		label=label, 
-	)
+	plotexp!(x, y, stdev, xtype, field, label)
 end
-
-# ╔═╡ b6dd438c-4e57-4b52-a1f5-98d29f16acc6
-md"# Ant gather"
-
-# ╔═╡ fafa619c-8187-4ffe-a6ec-994957dfb7d4
-md"### Tune"
 
 # ╔═╡ 456f5fd5-ef9c-4691-9c6d-b8ec408d894e
 function plot_tune(exps, title_pref, save_pref)
@@ -414,6 +541,30 @@ function plot_tune(exps, title_pref, save_pref)
 	savefig("$save_pref/tune/tune_sigma")
 end
 
+# ╔═╡ 015d8f93-a60a-4d5e-a656-0c5e4a58e852
+function plothiro!(dfs)
+	xs = vcat(
+		[df.cumtime / 3600 for df in dfs],
+		# [df.cumtime / 3600 for df in dfs],
+		# [df.cumtime / 3600 for df in dfs]
+	)
+	ys = vcat(
+		# [fix_main_fit(df[!, "Reward/average_eval1_hrl_success"]) for df in dfs],
+		[fix_main_fit(df[!, "Reward/average_eval2_hrl_success"]) for df in dfs],
+		# [fix_main_fit(df[!, "Reward/average_eval3_hrl_success"]) for df in dfs],
+	)
+
+	smooth_xs, smooth_ys, smooth_stdev = prep_data(xs, ys, .2)
+	
+	plot!(smooth_xs, smooth_ys, ribbon=smooth_stdev, fillalpha=.5, label="HIRO")
+end
+
+# ╔═╡ b6dd438c-4e57-4b52-a1f5-98d29f16acc6
+md"# Ant gather"
+
+# ╔═╡ fafa619c-8187-4ffe-a6ec-994957dfb7d4
+md"### Tune"
+
 # ╔═╡ 97293ad9-4ef1-46ec-ba4c-ea593a66d449
 plot_tune(gather_tune, "Ant Gather:", "gather")
 
@@ -423,11 +574,15 @@ md"### Test reward"
 # ╔═╡ ecb988c8-844b-4a69-9870-613398238f65
 begin
 	t1 = "Ant Gather: Test Reward Per Environment Steps"
+
+	all_nohot_dfs = vcat(gather_nohot_dfs, gather_5_dfs, gather_10_dfs)
+	gx, gy, gstd = prep_data(all_nohot_dfs, "Samples", "Test Reward", 0.2)
+	gcutoff = 1:900
 	
-	plotexp(gather_nohot_dfs, "Samples", "Test Reward", t1, "SHES")
+	plotexp(gx[gcutoff], gy[gcutoff], gstd[gcutoff], "Samples", "Test Reward", t1, "SHES")
 	plotexp!(gather_onehot_dfs, "Samples", "Test Reward", "SHES one-hot")
 
-	gather_other_xs = [0, 4e9] # [0, 24] [0, 4e9]
+	gather_other_xs = [0, 4e9]
 	plot!(gather_other_xs, [3.02, 3.02], label="HIRO")
 	plot!(gather_other_xs, [0.85, 0.85], label="FuN")
 	plot!(gather_other_xs, [1.92, 1.92], label="SNN4HRL")
@@ -436,17 +591,38 @@ begin
 	# savefig("gather test rew [steps]")
 end
 
+# ╔═╡ 0fa2bbcd-0b9e-4f79-8679-0e7d698d0068
+begin
+	t5 = "Ant Gather: Test Reward Per Wall Clock Time"
+	
+	plotexp(gather_nohot_dfs, "Time (h)", "Test Reward", t5, "SHES 48 cores")
+	# plotexp!(gather_onehot_dfs, "Time (h)", "Test Reward", "SHES one-hot")
+	plotexp!(gather_5_dfs, "Time (h)", "Test Reward", "SHES 120 cores")
+	plotexp!(gather_10_dfs, "Time (h)", "Test Reward", "SHES 240 cores")
+
+	gather_other_xs2 = [0, 24]
+	plot!(gather_other_xs2, [3.02, 3.02], label="HIRO")
+	plot!(gather_other_xs2, [0.85, 0.85], label="FuN")
+	plot!(gather_other_xs2, [1.92, 1.92], label="SNN4HRL")
+	plot!(gather_other_xs2, [1.42, 1.42], label="VIME")
+
+	# savefig("gather test rew [time]")
+end
+
 # ╔═╡ efca9de3-e1f8-47de-8c7f-47f9f6b72ba9
-md"### Pretraining"
+md"### Pretraining+NS"
 
 # ╔═╡ a49117d2-562f-4af2-be5e-9f56423fe9c0
 begin
-	t4 = "Ant Gather: Pretraining vs SHES"
+	t4 = "Ant Gather: Pretrained vs Novelty vs Base SHES"
 	
-	plotexp(gather_nohot_dfs, "Samples", "Test Reward", t4, "SHES")
-	plotexp!(gather_pretrained_dfs, "Samples", "Test Reward", "Pretrained")
+	plotexp(gather_nohot_dfs, "Time (h)", "Test Reward", t4, "SHES")
+	plotexp!(gather_pretrained_dfs, "Time (h)", "Test Reward", "Pretrained")
+	plotexp!(gather_ns_dfs, "Time (h)", "Test Reward", "Novelty")
 
-	savefig("gather pretrained")
+	# TODO get ns time working
+	
+	# savefig("gather pretrained")
 end
 
 # ╔═╡ 9c6878e0-741d-4030-9d4a-94fa40184221
@@ -458,8 +634,10 @@ begin
 	
 	plotexp(gather_nohot_dfs, "Time (h)", "Mean Primitive Reward", t3, "SHES")
 	plotexp!(gather_onehot_dfs, "Time (h)", "Mean Primitive Reward", "SHES one-hot")
+	plotexp!(gather_ns_dfs, "Time (h)", "Mean Primitive Reward", "NS")
+	plotexp!(gather_pretrained_dfs, "Time (h)", "Mean Primitive Reward", "Pretrain")
 
-	savefig("gather prim train rew")
+	# savefig("gather prim train rew")
 end
 
 # ╔═╡ 379ac95f-6d0a-446a-9dec-24135d79ea2c
@@ -467,9 +645,10 @@ md"### Speed up"
 
 # ╔═╡ 64dcdbd6-1184-4fb5-a84e-0b718dfb9a46
 begin
-	plotexp(gather_nohot_dfs, "Time (h)", "Test Reward", t1, "SHES")
-	plotexp!(gather_5_dfs, "Time (h)", "Test Reward", "5 node")
-	plotexp!(gather_10_dfs, "Time (h)", "Test Reward", "10 node")
+	t6 = "Ant Gather: Test Reward comparison with differing number of processors"
+	plotexp(gather_nohot_dfs, "Time (h)", "Test Reward", t1, "48")
+	plotexp!(gather_5_dfs, "Time (h)", "Test Reward", "120")
+	plotexp!(gather_10_dfs, "Time (h)", "Test Reward", "240")
 end
 
 # ╔═╡ e4cc1434-ef87-43f0-80c9-e84c9690dda5
@@ -484,10 +663,16 @@ md"### Test reward"
 # ╔═╡ ae589eef-898c-4c6f-957d-ccb240e13c55
 begin
 	t2 = "Ant Maze: Test Reward Per Environmental Steps"
-	plotexp(maze_dfs, "Samples", "Test Reward", t2, "SHES")
 
-	maze_other_xs = [0, 4.7e9] # [0,12.75] | [0, 4.7e9]
+	all_maze_dfs = vcat(maze_dfs, maze_5node_dfs, maze_10node_dfs)
 	
+	# all_maze_dfs[1] has an uptick right at the end which throws off interp
+	mx, my, mstd = prep_data(all_maze_dfs, "Samples", "Test Reward", 0.2)
+	mcutoff = 1:1650  
+	
+	plotexp(mx[mcutoff], my[mcutoff], mstd[mcutoff], "Samples", "Test Reward", t2, "SHES", :topright)
+
+	maze_other_xs = [0, 8e9] 
 	plot!(maze_other_xs, [0.99,0.99], label="HIRO")
 	plot!(maze_other_xs, [0.16, 0.16], label="FuN")
 	plot!(maze_other_xs, [0, 0], label="SNN4HRL+VIME")
@@ -495,8 +680,138 @@ begin
 	# savefig("maze test rew [steps]")
 end
 
+# ╔═╡ b48b0893-266b-4937-af92-16045dcec171
+begin
+	t7 = "Ant Maze: Test Reward Per Wall Clock Time"
+	
+	plotexp(maze_dfs, "Time (h)", "Test Reward", t7, "SHES", :topright)
+	plotexp!(maze_5node_dfs, "Time (h)", "Test Reward", "120")
+	plotexp!(maze_10node_dfs, "Time (h)", "Test Reward", "240")
+
+	plothiro!(hiro_maze[1:7])
+
+	maze_other_xs2 = [0, 23.85]
+	plot!(maze_other_xs2, [0.16, 0.16], label="FuN")
+	plot!(maze_other_xs2, [0, 0], label="SNN4HRL+VIME")
+
+	# savefig("maze test rew [time]")
+end
+
+# ╔═╡ 67939190-1a19-45f9-a27f-01021b497c07
+md"### Train Reward"
+
+# ╔═╡ 8de599b3-39a1-4e7c-af38-f1e40864d059
+begin
+	t8 = "Ant Maze: Mean Primitive Training Reward"
+	
+	plotexp(maze_dfs, "Time (h)", "Mean Primitive Reward", t8, "SHES")
+	plotexp!(maze_pt_dfs, "Time (h)", "Mean Primitive Reward", "PT")
+	plotexp!(maze_ns_dfs, "Time (h)", "Mean Primitive Reward", "NS")
+	
+	# savefig("maze prim train rew")
+end
+
+# ╔═╡ 4c4c7482-867b-474c-abea-8dc9ea82c890
+md"### Pretrain + NS"
+
+# ╔═╡ 6158877d-4494-44d0-836d-81829ae391bf
+begin
+	t9 = "Ant Maze: Pretrained vs Novelty vs Base SHES"
+	
+	plotexp(maze_dfs, "Time (h)", "Test Reward", t9, "SHES")
+	plotexp!(maze_pt_dfs, "Time (h)", "Test Reward", "Pretrained")
+	plotexp!(maze_ns_dfs, "Time (h)", "Test Reward", "NS")
+	
+	# savefig("maze pretrained")
+end
+
+# ╔═╡ 09bfe3f2-3a07-4701-a169-76d6b12490ba
+md"### Speedup"
+
+# ╔═╡ c054a6ca-d352-4eb4-912b-9ed55b0c8b59
+begin
+	t10 = "Ant Maze: Test Reward with differing number of processors"
+	plotexp(maze_dfs, "Time (h)", "Test Reward", t10, "48")
+	plotexp!(maze_5node_dfs, "Time (h)", "Test Reward", "120")
+	plotexp!(maze_10node_dfs, "Time (h)", "Test Reward", "240")
+end
+
+# ╔═╡ b3c916f1-fed1-4ce7-a0cc-84b16877dcb3
+md"### Tune"
+
+# ╔═╡ e23d4c2f-620f-4fc4-b56a-0a285639e4ea
+plot_tune(maze_tune, "Ant Maze:", "maze")
+
 # ╔═╡ a16e058e-728e-4a24-a21a-aaafb5a6c183
 md"# Ant Push"
+
+# ╔═╡ a07694f7-bfcb-4a0e-87a4-7d5fddeeb5c8
+md"### Test Reward"
+
+# ╔═╡ d8669c2a-e38b-44f7-aeec-7920dc5abf1c
+begin
+	t11 = "Ant Push: Test Reward Per Environmental Steps"
+
+	all_push_dfs = vcat(push_dfs, push_5node_dfs)
+	plotexp(all_push_dfs, "Samples", "Test Reward", t11, "SHES")
+	
+	push_other_xs = [0, 6.4e9]
+	plot!(push_other_xs, [0.92,0.92], label="HIRO")
+	plot!(push_other_xs, [0.56, 0.56], label="FuN")
+	plot!(push_other_xs, [0.02, 0.02], label="SNN4HRL+VIME")
+
+	# savefig("push test rew [steps]")
+end
+
+# ╔═╡ 947dcf8c-3799-47d7-9d78-1058e111ea60
+begin
+	t12 = "Ant Push: Test Reward Per Wall Clock Time"
+
+	plotexp(push_dfs, "Time (h)", "Test Reward", t12, "SHES 48 cores")
+
+	# did too many gens of 5 node
+	x, y, stdev = prep_data(push_5node_dfs, "Time (h)", "Test Reward", 0.2)
+	cutoff = 1:1619
+	plotexp!(x[cutoff],y[cutoff],stdev[cutoff], "Time (h)", "Test Reward", "SHES 120 cores")
+
+	plothiro!(hiro_push)
+	push_other_xs_t = [0, 11.98] 
+	plot!(push_other_xs_t, [0.16, 0.16], label="FuN")
+	plot!(push_other_xs_t, [0, 0], label="SNN4HRL+VIME")
+
+	# savefig("push test rew [time]")
+end
+
+# ╔═╡ eea5569f-cea7-493b-965d-91bab81dee7c
+md"### Pretrain + NS"
+
+# ╔═╡ 48f0f7c3-1492-4d94-a755-58ede5b3d3fd
+begin
+	t13 = "Ant Push: Pretrained vs Novelty vs Base SHES"
+	
+	plotexp(push_dfs, "Samples", "Test Reward", t13, "SHES")
+	plotexp!(push_pt_dfs, "Samples", "Test Reward", "Pretrained")
+	plotexp!(push_ns_dfs, "Samples", "Test Reward", "NS")
+	
+	# savefig("push pretrained")
+end
+
+# ╔═╡ 07861635-0ce0-4315-9259-91956e6f5f1a
+md"### Prim reward"
+
+# ╔═╡ b2419d55-5d0e-43a5-a1d5-f10e645ae388
+begin
+	t14 = "Ant Push: Mean Primitive Training Reward"
+	
+	plotexp(push_dfs, "Time (h)", "Mean Primitive Reward", t14, "SHES")
+	plotexp!(push_pt_dfs, "Time (h)", "Mean Primitive Reward", "SHES")
+	plotexp!(push_ns_dfs, "Time (h)", "Mean Primitive Reward", "SHES")
+	
+	# savefig("maze prim train rew")
+end
+
+# ╔═╡ bccedaad-c533-4dbb-90f8-79140e5af04b
+md"### Speedup"
 
 # ╔═╡ 50f946d3-937e-448d-835e-e17e676e67c4
 md"### Tune"
@@ -505,7 +820,7 @@ md"### Tune"
 plot_tune(push_tune, "Ant Push:", "push")
 
 # ╔═╡ fbb132aa-4f45-4f22-9339-25511aaa840b
-md"##### Finding values"
+md"##### Scratch"
 
 # ╔═╡ 8d5baceb-f1e3-451a-92d5-cfabebaea4e7
 begin
@@ -519,20 +834,12 @@ begin
 	mean([x[end] for x in raw_xs])
 end
 
-# ╔═╡ 9c21c1e0-46d2-4647-880c-9206ad502c61
-md"# HIRO"
-
-# ╔═╡ 015d8f93-a60a-4d5e-a656-0c5e4a58e852
-# average_eval1_hrl_success
-begin
-	xs = [df.step * df.step_per_sec[1] for df in hiro_maze]
-	ys = vcat(
-		[fix_main_fit(df[!, "Reward/average_eval1_hrl_success"]) for df in hiro_maze],
-		[fix_main_fit(df[!, "Reward/average_eval2_hrl_success"]) for df in hiro_maze],
-		[fix_main_fit(df[!, "Reward/average_eval3_hrl_success"]) for df in hiro_maze]
-	)
-	
-	plot(xs,ys)
+# ╔═╡ b4edcf02-66f9-4ff7-a168-ea3100e5a5c6
+function inc_run_names(path, inc)
+	for f in reverse(readdir(path))
+		cn = parse(Int, split(f, "_")[end])
+		mv(joinpath(path, f), joinpath(path, "$(f[1:end-1])$(cn+inc)"))
+	end
 end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -1529,30 +1836,38 @@ version = "0.9.1+5"
 # ╠═bdbd896d-0761-4d30-82ab-928889953d3f
 # ╟─3163445d-ce5e-424a-961a-5ca03a34f177
 # ╟─27ea31d5-52ab-4186-8859-48e912abbe07
+# ╟─1341a522-35b1-4d12-acc5-5455cff02992
 # ╟─a28bbacf-5fa1-4a60-9ac5-66ca96dd0765
 # ╟─4bab0152-d53f-4bb9-a38a-49930797c632
 # ╟─ec291a04-df1a-4b4a-89e1-6e15d5c6b8d2
+# ╟─9f9e14fe-8568-48c2-9106-4e265bc284d8
 # ╟─5aa5ddd3-e896-47e7-bdd1-effda634168e
-# ╟─bed86641-3ef4-48f9-b27b-b7a98da0d2eb
-# ╟─593931df-9fba-4548-ad2b-b48e8abec8ba
-# ╠═35dc88a2-9b9a-4d57-8036-ca198020276c
+# ╠═bed86641-3ef4-48f9-b27b-b7a98da0d2eb
+# ╠═593931df-9fba-4548-ad2b-b48e8abec8ba
+# ╟─35dc88a2-9b9a-4d57-8036-ca198020276c
 # ╠═519e5b4f-d204-4f3a-b473-52e45ec796f4
-# ╠═8e03a713-5bb2-44c6-a61b-7fdbf7ea41a5
-# ╠═23463959-ea89-4276-80a1-92cb3ff105b0
+# ╟─8e03a713-5bb2-44c6-a61b-7fdbf7ea41a5
+# ╟─23463959-ea89-4276-80a1-92cb3ff105b0
 # ╠═08ee1e2d-0f88-4692-b9d8-62301cb06aa9
-# ╠═0b2d3f1c-3a78-4d7a-94dd-5eab9118faa2
-# ╠═f91781de-3d67-48f5-b82a-90d91e105812
-# ╠═22594eef-9489-4d68-9090-f4958e219b4f
-# ╠═f878eb74-dc63-4a02-8aaf-2b5641c37c59
+# ╟─0b2d3f1c-3a78-4d7a-94dd-5eab9118faa2
+# ╟─f91781de-3d67-48f5-b82a-90d91e105812
+# ╟─7d484f3b-57b6-4ea7-84d6-91be70916021
+# ╟─22594eef-9489-4d68-9090-f4958e219b4f
+# ╟─f878eb74-dc63-4a02-8aaf-2b5641c37c59
+# ╟─fc226d0f-5c1b-4eb8-a725-4b45d7151c97
 # ╠═b9f2c016-93e1-440d-88c3-3f30921de1bd
-# ╠═fa3f66c2-b52a-48fd-9e49-42e8815880fa
-# ╠═6832f9ac-5105-47fb-a817-c1e5ce5dc6b8
+# ╟─468a639c-8a6c-417e-bac6-29c770a640f1
+# ╟─c4460ecb-31a8-439a-b7d7-3f08068926f0
+# ╟─fa3f66c2-b52a-48fd-9e49-42e8815880fa
+# ╟─6832f9ac-5105-47fb-a817-c1e5ce5dc6b8
+# ╟─456f5fd5-ef9c-4691-9c6d-b8ec408d894e
+# ╠═015d8f93-a60a-4d5e-a656-0c5e4a58e852
 # ╟─b6dd438c-4e57-4b52-a1f5-98d29f16acc6
 # ╟─fafa619c-8187-4ffe-a6ec-994957dfb7d4
-# ╠═456f5fd5-ef9c-4691-9c6d-b8ec408d894e
 # ╠═97293ad9-4ef1-46ec-ba4c-ea593a66d449
 # ╟─b60af232-58db-488b-b48e-baf6cd412d15
 # ╠═ecb988c8-844b-4a69-9870-613398238f65
+# ╠═0fa2bbcd-0b9e-4f79-8679-0e7d698d0068
 # ╟─efca9de3-e1f8-47de-8c7f-47f9f6b72ba9
 # ╠═a49117d2-562f-4af2-be5e-9f56423fe9c0
 # ╟─9c6878e0-741d-4030-9d4a-94fa40184221
@@ -1563,13 +1878,29 @@ version = "0.9.1+5"
 # ╟─0bfb4725-966c-48a2-9efe-253355030ae8
 # ╟─0e47ea2c-0041-4209-89af-e6070ff2727f
 # ╠═ae589eef-898c-4c6f-957d-ccb240e13c55
+# ╠═b48b0893-266b-4937-af92-16045dcec171
+# ╟─67939190-1a19-45f9-a27f-01021b497c07
+# ╠═8de599b3-39a1-4e7c-af38-f1e40864d059
+# ╟─4c4c7482-867b-474c-abea-8dc9ea82c890
+# ╠═6158877d-4494-44d0-836d-81829ae391bf
+# ╟─09bfe3f2-3a07-4701-a169-76d6b12490ba
+# ╠═c054a6ca-d352-4eb4-912b-9ed55b0c8b59
+# ╟─b3c916f1-fed1-4ce7-a0cc-84b16877dcb3
+# ╠═e23d4c2f-620f-4fc4-b56a-0a285639e4ea
 # ╟─a16e058e-728e-4a24-a21a-aaafb5a6c183
+# ╟─a07694f7-bfcb-4a0e-87a4-7d5fddeeb5c8
+# ╠═d8669c2a-e38b-44f7-aeec-7920dc5abf1c
+# ╠═947dcf8c-3799-47d7-9d78-1058e111ea60
+# ╟─eea5569f-cea7-493b-965d-91bab81dee7c
+# ╠═48f0f7c3-1492-4d94-a755-58ede5b3d3fd
+# ╟─07861635-0ce0-4315-9259-91956e6f5f1a
+# ╠═b2419d55-5d0e-43a5-a1d5-f10e645ae388
+# ╟─bccedaad-c533-4dbb-90f8-79140e5af04b
 # ╟─50f946d3-937e-448d-835e-e17e676e67c4
 # ╠═868412e5-f725-415b-a7ab-d6bed0e15b13
 # ╟─fbb132aa-4f45-4f22-9339-25511aaa840b
 # ╠═8d5baceb-f1e3-451a-92d5-cfabebaea4e7
 # ╠═a1cd331f-2d70-4802-8d76-7038268da1e7
-# ╟─9c21c1e0-46d2-4647-880c-9206ad502c61
-# ╠═015d8f93-a60a-4d5e-a656-0c5e4a58e852
+# ╠═b4edcf02-66f9-4ff7-a168-ea3100e5a5c6
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
