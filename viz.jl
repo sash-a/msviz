@@ -763,6 +763,10 @@ begin
 	ag_pref = "Ant Gather:"
 	# Main
 	plotmain(g_pables, "$ag_pref SHES vs Gradient Methods")
+	plot!([0, ct], [3.02, 3.02], label="HIRO (theirs)")
+	plot!([0, ct], [0.85, 0.85], label="FuN")
+	# plot!([0, ct], [1.92, 1.92], label="SNN4HRL")
+	# plot!([0, ct], [1.42, 1.42], label="VIME")
 	savefig("imgs/gather/gather-tr-time")
 	#Extensions
 	# CTRL
@@ -788,6 +792,9 @@ begin
 	am_pref = "Ant Maze:"
 	# Main
 	plotmain(m_pables, "$am_pref SHES vs Gradient Methods")
+	plot!([0, ct], [0.99, 0.99], label="HIRO")
+	plot!([0, ct], [0.16, 0.16], label="FuN")
+	# plot!([0, ct], [0, 0], label="SNN4HRL+VIME")
 	savefig("imgs/maze/maze-tr-time")
 	#Extensions
 	# CTRL
@@ -810,6 +817,9 @@ begin
 	ap_pref = "Ant Push:"
 	# Main
 	plotmain(p_pables, "$ap_pref SHES vs Gradient Methods")
+	plot!([0, ct], [0.92,0.92], label="HIRO")
+	plot!([0, ct], [0.56, 0.56], label="FuN")
+	# plot!([0, ct], [0.02, 0.02], label="SNN4HRL+VIME")
 	savefig("imgs/push/push-tr-time")
 	#Extensions
 	# CTRL
