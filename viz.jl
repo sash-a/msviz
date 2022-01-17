@@ -485,15 +485,17 @@ end
 # ╔═╡ b9f2c016-93e1-440d-88c3-3f30921de1bd
 function prep_data(dfs, x_ax, y_ax, smoothness; cutofftime=nothing)
 	cutoffs = if cutofftime !== nothing
-		# [1:findfirst(x -> x > cutofftime, df[!, "Time (h)"]) for df in dfs]
+		min_time = minimum(df -> df[!, "Time (h)"][end], dfs)
+		cutofftime = min(min_time, cutofftime)
+		[1:findfirst(x -> x >= cutofftime, df[!, "Time (h)"]) for df in dfs]
 
-		x = []
-		for df in dfs
-			ftime = findfirst(x -> x > cutofftime, df[!, "Time (h)"])
-			ftime = ftime === nothing ? nrow(df) : ftime
-			push!(x, 1:ftime)
-		end
-		x
+		# x = []
+		# for df in dfs
+		# 	ftime = findfirst(x -> x > cutofftime, df[!, "Time (h)"])
+		# 	ftime = ftime === nothing ? nrow(df) : ftime
+		# 	push!(x, 1:ftime)
+		# end
+		# x
 	else
 		[1:nrow(df) for df in dfs]
 	end
@@ -745,22 +747,85 @@ begin
 end
 
 # ╔═╡ d18d3765-3c63-4ce7-9a69-3b820442f161
-plotmain(pable; yax=TR) = multiplot([pable.two, pable.ten, pable.hiro], TIME, yax, "SHES vs gradient based methods")
+plotmain(pable,t;yax=TR) = multiplot([pable.two, pable.ten, pable.hiro], TIME, yax, t)
 
 # ╔═╡ 15f7aceb-8388-4d2d-9a8b-0f4a87f2f656
-plotnodes(pable; yax=TR) = multiplot([pable.two, pable.five, pable.ten], TIME, yax, "SHES Multicore comparison")
+plotnodes(pable,t;yax=TR) = multiplot([pable.two, pable.five, pable.ten], TIME, yax,t)
 
 # ╔═╡ 507a87b4-47ec-4cdf-80ca-6f7e87afb876
-plotexts(pable; yax=TR) = multiplot([pable.two, pable.pt], TIME, yax, "SHES vs Extensions")
-
-# ╔═╡ 8090773f-e2c3-4c44-8428-d7284221050d
-plotnodes(m_pables;yax=CR)
+plotexts(pable, t; yax=TR) = multiplot([pable.two, pable.pt], TIME, yax, t)
 
 # ╔═╡ b6dd438c-4e57-4b52-a1f5-98d29f16acc6
 md"# Ant gather"
 
 # ╔═╡ f9551d45-b4c1-43a4-a76e-afd7ff53bd95
+begin
+	ag_pref = "Ant Gather:"
+	# Main
+	plotmain(g_pables, "$ag_pref SHES vs Gradient Methods")
+	savefig("imgs/gather/gather-tr-time")
+	#Extensions
+	# CTRL
+	plotexts(g_pables, "$ag_pref SHES vs Extensions (Controller Reward)"; yax=CR)  
+	savefig("imgs/gather/gather-exts-ctrl")
+	# PRIM
+	plotexts(g_pables, "$ag_pref SHES vs Extensions (Primitive Reward)"; yax=PR)  
+	savefig("imgs/gather/gather-exts-prim")
+	# Speedup
+	# Test rew
+	plotnodes(g_pables, "$ag_pref Multicore Comparison (Test Score)")  
+	savefig("imgs/gather/gather-nodes-testr")
+	# CTRL
+	plotnodes(g_pables, "$ag_pref Multicore Comparison (Train Reward)"; yax=CR)  
+	savefig("imgs/gather/gather-nodes-ctrl")
+	# one-hot
+	multiplot([g_plot, g_onehot_plot], TIME, TR, "Ant Gather: SHES vs SHES-onehot")
+	savefig("imgs/gather/gather-onehot")
+end
 
+# ╔═╡ a9802abb-9061-43f9-92ed-c88c76fa058c
+begin
+	am_pref = "Ant Maze:"
+	# Main
+	plotmain(m_pables, "$am_pref SHES vs Gradient Methods")
+	savefig("imgs/maze/maze-tr-time")
+	#Extensions
+	# CTRL
+	plotexts(m_pables, "$am_pref SHES vs Extensions (Controller Reward)"; yax=CR)  
+	savefig("imgs/maze/maze-exts-ctrl")
+	# PRIM
+	plotexts(m_pables, "$am_pref SHES vs Extensions (Primitive Reward)"; yax=PR)  
+	savefig("imgs/maze/maze-exts-prim")
+	# Speedup
+	# Test rew
+	plotnodes(m_pables, "$am_pref Multicore Comparison (Test Score)")  
+	savefig("imgs/maze/maze-nodes-testr")
+	# CTRL
+	plotnodes(m_pables, "$am_pref Multicore Comparison (Train Reward)"; yax=CR)  
+	savefig("imgs/maze/maze-nodes-ctrl")
+end
+
+# ╔═╡ dcbc444f-1abb-4ad3-b53e-0b4973576b45
+begin
+	ap_pref = "Ant Push:"
+	# Main
+	plotmain(p_pables, "$ap_pref SHES vs Gradient Methods")
+	savefig("imgs/push/push-tr-time")
+	#Extensions
+	# CTRL
+	plotexts(p_pables, "$ap_pref SHES vs Extensions (Controller Reward)"; yax=CR)  
+	savefig("imgs/push/push-exts-ctrl")
+	# PRIM
+	plotexts(p_pables, "$ap_pref SHES vs Extensions (Primitive Reward)"; yax=PR)  
+	savefig("imgs/push/push-exts-prim")
+	# Speedup
+	# Test rew
+	plotnodes(p_pables, "$ap_pref Multicore Comparison (Test Score)")  
+	savefig("imgs/push/push-nodes-testr")
+	# CTRL
+	plotnodes(p_pables, "$ap_pref Multicore Comparison (Train Reward)"; yax=CR)  
+	savefig("imgs/push/push-nodes-ctrl")
+end
 
 # ╔═╡ fafa619c-8187-4ffe-a6ec-994957dfb7d4
 md"### Tune"
@@ -915,7 +980,7 @@ begin
 	plotexp!(maze_pt_dfs, "Time (h)", "Test Reward", "Pretrained")
 	# plotexp!(maze_ns_dfs, "Time (h)", "Test Reward", "NS"; cutofftime=ct)
 	
-	# savefig("imgs/maze/maze-pt-test")
+	savefig("imgs/maze/maze-pt-test")
 end
 
 # ╔═╡ 09bfe3f2-3a07-4701-a169-76d6b12490ba
@@ -2235,9 +2300,10 @@ version = "0.9.1+5"
 # ╠═d18d3765-3c63-4ce7-9a69-3b820442f161
 # ╠═15f7aceb-8388-4d2d-9a8b-0f4a87f2f656
 # ╠═507a87b4-47ec-4cdf-80ca-6f7e87afb876
-# ╠═8090773f-e2c3-4c44-8428-d7284221050d
 # ╟─b6dd438c-4e57-4b52-a1f5-98d29f16acc6
 # ╠═f9551d45-b4c1-43a4-a76e-afd7ff53bd95
+# ╠═a9802abb-9061-43f9-92ed-c88c76fa058c
+# ╠═dcbc444f-1abb-4ad3-b53e-0b4973576b45
 # ╟─fafa619c-8187-4ffe-a6ec-994957dfb7d4
 # ╠═97293ad9-4ef1-46ec-ba4c-ea593a66d449
 # ╟─b60af232-58db-488b-b48e-baf6cd412d15
