@@ -12,10 +12,26 @@ begin
 	using Statistics
 	using Loess
 	using Interpolations
+	using HypothesisTests
 end
 
 # ╔═╡ b29d2430-3950-4544-8daf-57be549a690f
-trials = 5
+ct = 10
+
+# ╔═╡ 1b4dc0db-9f47-4a94-9bbc-b70c30972997
+TR = "Test Reward"
+
+# ╔═╡ 006035ef-08f6-4f9f-9dfb-043abfaf6af6
+CR = "Mean Controller Reward"
+
+# ╔═╡ c1dae931-ab39-4d98-bb9d-0453ce0e9e52
+PR = "Mean Primitive Reward"
+
+# ╔═╡ a36250ad-7318-4e57-a6ae-c36e782d2214
+TIME = "Time (h)"
+
+# ╔═╡ 7df4d38a-4b25-437c-975c-78010c3729c1
+SAMPLES = "Samples"
 
 # ╔═╡ bdbd896d-0761-4d30-82ab-928889953d3f
 pathprefix = "../ScalableHrlEs/csv_logs"
@@ -25,24 +41,29 @@ begin
 	# Gather
 	gather_nohot_path = "$pathprefix/gather/tuned/nohot/AntGather_tuned_"
 	gather_onehot_path = "$pathprefix/gather/tuned/onehot/AntGather_tuned-onehot_"
-	gather_pt_path = "$pathprefix/gather/pretrained/AntGather-pretrained_pretrained_"
+	gather_pt_path = "$pathprefix/gather/tl/AntGather-pre_pt1_"
 	gather_ns_path = "$pathprefix/gather/ns/AntGather-ns-endposbehv_ns_"
 	gather_5_path = "$pathprefix/gather/speedup/AntGather_5node_"
 	gather_10_path = "$pathprefix/gather/speedup/AntGather_10node_"
+	gather_single_path = "$pathprefix/gather/AntGather_single_"
 
 	# Maze
 	maze_path = "$pathprefix/maze/tuned/AntMaze_tuned_"
-	maze_pretrain_path = "$pathprefix/maze/pretrained/AntMaze-pre-fix_pt_"
+	maze_pt_path = "$pathprefix/maze/tl/AntMaze-pre-fix_pt_"
 	maze_ns_path = "$pathprefix/maze/ns/AntMaze-ns-endposbehv_ns_"
 	maze_5_node_path = "$pathprefix/maze/speedup/AntMaze_5node_"
 	maze_10_node_path = "$pathprefix/maze/speedup/AntMaze_10node_"
+	maze_single_path = "$pathprefix/maze/AntMaze_single_"
+
 
 	# Push
 	push_path = "$pathprefix/push/tuned/AntPush_tuned_"
-	push_pretrain_path = "$pathprefix/push/pretrained/AntPush-pre-fix_pt_"
+	push_pt_path = "$pathprefix/push/tl/AntPush-pre_pt1_"
 	push_ns_path = "$pathprefix/push/ns/AntPush-ns-endposbehv_ns_"
 	push_5_node_path = "$pathprefix/push/speedup/AntPush_5node_"
 	push_10_node_path = "$pathprefix/push/speedup/AntPush_10node_"
+	push_single_path = "$pathprefix/push/AntPush_single_"
+
 end
 
 # ╔═╡ 27ea31d5-52ab-4186-8859-48e912abbe07
@@ -199,8 +220,10 @@ end
 
 # ╔═╡ 593931df-9fba-4548-ad2b-b48e8abec8ba
 begin
-	hiro_maze = readhiro("$pathprefix/hiro/maze/maze", 1:10)
-	hiro_push = readhiro("$pathprefix/hiro/push/push", 1:10)
+	hiro_gather = readhiro("$pathprefix/gpu/hiro_orig/ant_gather/base_uvf/gather", 1:10)
+	hiro_maze = readhiro("$pathprefix/gpu/hiro_orig/ant_maze/base_uvf/maze", 1:9)
+	hiro_push = readhiro("$pathprefix/gpu/hiro_orig/ant_push_single/base_uvf/push", 1:10)
+
 	"HIRO"
 end
 
@@ -213,7 +236,6 @@ function clean(stacked_df, fix_gentime=false, missing_gentime=false)
 	
 	if fix_gentime # fixing gen time logging bug - logged gentime in second half of df
 		ndata = floor(Int32, (nrow(df) - 1) / 2)
-		@show ndata
 		df[1:ndata, :gen_time_s] = df[ndata+1:ndata*2, :gen_time_s]  
 		df = df[1:ndata, names(df)]  # cutting off at half the gens
 	end
@@ -254,10 +276,10 @@ end
 
 # ╔═╡ ec291a04-df1a-4b4a-89e1-6e15d5c6b8d2
 begin
-	gthr_base_dfs = readlog(gthr_tune_base_pth, 0:2)
+	gthr_base_dfs = readlog(gthr_tune_base_pth, 0:9)
 	
 	gthr_cd2_dfs = readlog(gthr_tune_cd2_pth, 0:2)
-	gthr_cd8_dfs = readlog(gthr_tune_cd8_pth, 0:2)
+	gthr_cd8_dfs = readlog(gthr_tune_cd8_pth, 0:9)
 
 	gthr_ep3_dfs = readlog(gthr_tune_ep3_pth, 0:2)
 	gthr_ep10_dfs = readlog(gthr_tune_ep10_pth, 0:2)
@@ -295,25 +317,27 @@ end
 # ╔═╡ 9f9e14fe-8568-48c2-9106-4e265bc284d8
 begin
 	mze_base_dfs = readlog(mze_tune_base_pth, 0:9)
+	mze_cd2_dfs = readlog(mze_tune_cd2_pth, 0:9)
+	mze_cd8_dfs = readlog(mze_tune_cd8_pth, 0:9)
+	mze_ep3_dfs = readlog(mze_tune_ep3_pth, 0:9)
+	mze_ep10_dfs = readlog(mze_tune_ep10_pth, 0:9)
+	mze_ep10_dfs=nothing
 	
-	mze_cd2_dfs = readlog(mze_tune_cd2_pth, 0:7)
-	mze_cd8_dfs = readlog(mze_tune_cd8_pth, 0:7)
-
-	mze_ep3_dfs = readlog(mze_tune_ep3_pth, 0:2)
-	mze_ep10_dfs = readlog(mze_tune_ep10_pth, 0:2)
-
-	mze_int10_dfs = readlog(mze_tune_int10_pth, 0:2)
-	mze_int100_dfs = readlog(mze_tune_int100_pth, 0:2)
+	mze_int10_dfs = readlog(mze_tune_int10_pth, 0:9)
+	mze_int100_dfs = readlog(mze_tune_int100_pth, 0:9)
+	# mze_lr01_dfs = readlog(mze_tune_lr01_pth, 0:8)
+	# mze_lr0001_dfs = readlog(mze_tune_lr0001_pth, 0:9)
+	mze_lr01_dfs=nothing
+	mze_lr0001_dfs=nothing
 	
-	mze_lr01_dfs = readlog(mze_tune_lr01_pth, 0:2)
-	mze_lr0001_dfs = readlog(mze_tune_lr0001_pth, 0:2)
+	mze_ppg512_dfs = readlog(mze_tune_ppg512_pth, 0:9)
+	mze_ppg1000_dfs = readlog(mze_tune_ppg1000_pth, 0:9)
 
-	mze_ppg512_dfs = readlog(mze_tune_ppg512_pth, 0:2)
-	mze_ppg1000_dfs = readlog(mze_tune_ppg1000_pth, 0:2)  # todo 1 is broken
-
-	mze_sigma02_dfs = readlog(mze_tune_sigma02_pth, 0:2)
-	mze_sigma0002_dfs = readlog(mze_tune_sigma0002_pth, 0:2)
-
+	# mze_sigma02_dfs = readlog(mze_tune_sigma02_pth, 0:9)
+	# mze_sigma0002_dfs = readlog(mze_tune_sigma0002_pth, 0:9)
+	mze_sigma02_dfs=nothing
+	mze_sigma0002_dfs=nothing
+	
 	maze_tune = TuneRun(
 		mze_base_dfs, 
 		mze_cd2_dfs,
@@ -334,10 +358,10 @@ end
 
 # ╔═╡ 5aa5ddd3-e896-47e7-bdd1-effda634168e
 begin
-	psh_base_dfs = readlog(psh_tune_base_pth, 0:2)
+	psh_base_dfs = readlog(psh_tune_base_pth, 0:6)
 	
-	psh_cd2_dfs = readlog(psh_tune_cd2_pth, 0:2)
-	psh_cd8_dfs = readlog(psh_tune_cd8_pth, 0:2)
+	psh_cd2_dfs = readlog(psh_tune_cd2_pth, 0:9)
+	psh_cd8_dfs = readlog(psh_tune_cd8_pth, 0:9)
 
 	psh_ep3_dfs = readlog(psh_tune_ep3_pth, 0:2)
 	psh_ep10_dfs = readlog(psh_tune_ep10_pth, 0:2)
@@ -375,28 +399,36 @@ end
 # ╔═╡ bed86641-3ef4-48f9-b27b-b7a98da0d2eb
 begin
 	# GATHER
-	gather_nohot_dfs = readlog(gather_nohot_path, 0:trials-1, fix_gentime=true)
-	gather_onehot_dfs = readlog(gather_onehot_path, 0:trials-1)
+	gather_nohot_dfs = readlog(gather_nohot_path, 0:8)
+	gather_onehot_dfs = readlog(gather_onehot_path, 0:9)
 	
-	gather_pretrained_dfs = readlog(gather_pt_path, 0:4)
-	gather_ns_dfs = readlog(gather_ns_path, 0:4, missing_gentime=true)
-	
-	gather_10_dfs = readlog(gather_10_path, 0:2)
-	gather_5_dfs = readlog(gather_5_path, 0:2)
+	gather_pt_dfs = readlog(gather_pt_path, 0:9)
+	# gather_ns_dfs = readlog(gather_ns_path, 0:4, missing_gentime=true)
+
+	gather_10_dfs = readlog(gather_10_path, 0:4)
+	gather_5_dfs = readlog(gather_5_path, 1:4)
+	gather_single_df = readlog(gather_single_path, 0:0)
+	all_nohot_dfs = vcat(gather_nohot_dfs, gather_10_dfs, gather_5_dfs)
 	
 	# MAZE
-	maze_dfs = readlog(maze_path, 0:4, fix_gentime=true)
-	maze_pt_dfs = readlog(maze_pretrain_path, 0:4)
-	maze_ns_dfs = readlog(maze_ns_path, 0:4, missing_gentime=true)
-	maze_5node_dfs = readlog(maze_5_node_path, 0:2)
-	maze_10node_dfs = readlog(maze_10_node_path, 0:1)
+	maze_dfs = readlog(maze_path, 0:9)
+	maze_pt_dfs = readlog(maze_pt_path, 5:9)
+	# maze_ns_dfs = readlog(maze_ns_path, 0:4, missing_gentime=true)
+	maze_5node_dfs = readlog(maze_5_node_path, 2:4)
+	maze_10node_dfs = readlog(maze_10_node_path, 0:4)
+	maze_single_df = readlog(maze_single_path, 0:0)
+	all_maze_dfs = vcat(maze_dfs, maze_10node_dfs)
 
 	# PUSH
-	push_dfs = readlog(push_path, 0:4, fix_gentime=true)
-	push_pt_dfs = readlog(push_pretrain_path, 0:4)
-	push_ns_dfs = readlog(push_ns_path, 0:4, missing_gentime=true)
-	push_5node_dfs = readlog(push_5_node_path, 0:2)
-	push_10node_dfs = readlog(push_10_node_path, 1:1)
+	push_dfs = readlog(push_path, 0:9)
+	push_pt_dfs = readlog(push_pt_path, 0:9)
+	# push_ns_dfs = readlog(push_ns_path, 0:4)
+	push_5node_dfs = readlog(push_5_node_path, 0:4)
+	push_10node_dfs = readlog(push_10_node_path, 5:9)
+	push_single_df = readlog(push_single_path, 0:0)
+	all_push_dfs = vcat(push_dfs, push_10node_dfs)
+
+
 	"SHES"
 end
 
@@ -436,7 +468,7 @@ function prep_data(raw_xs, raw_ys, smoothness)
 
 	mn = 0
 	mx = mean([x[end] for x in raw_xs])
-	len = raw_xs |> xs -> map(length, xs) |> mean |> x-> trunc(Int, x)
+	len = raw_xs |> xs -> map(length, xs) |> minimum |> x-> trunc(Int, x)
 
 	xs = range(mn, mx, length=len)
 	ys = matrixize([[itp(x) for x in xs] for itp in itps])
@@ -451,9 +483,23 @@ function prep_data(raw_xs, raw_ys, smoothness)
 end
 
 # ╔═╡ b9f2c016-93e1-440d-88c3-3f30921de1bd
-function prep_data(dfs, x_ax, y_ax, smoothness)
-	raw_xs = map(df->df[!, x_ax], dfs)
-	raw_ys = map(df->df[!, y_ax], dfs)
+function prep_data(dfs, x_ax, y_ax, smoothness; cutofftime=nothing)
+	cutoffs = if cutofftime !== nothing
+		# [1:findfirst(x -> x > cutofftime, df[!, "Time (h)"]) for df in dfs]
+
+		x = []
+		for df in dfs
+			ftime = findfirst(x -> x > cutofftime, df[!, "Time (h)"])
+			ftime = ftime === nothing ? nrow(df) : ftime
+			push!(x, 1:ftime)
+		end
+		x
+	else
+		[1:nrow(df) for df in dfs]
+	end
+	
+	raw_xs = map((df, cutoff)->df[!, x_ax][cutoff], dfs, cutoffs)
+	raw_ys = map((df, cutoff)->df[!, y_ax][cutoff], dfs, cutoffs)
 	
 	prep_data(raw_xs, raw_ys, smoothness)
 end
@@ -484,74 +530,131 @@ function plotexp!(x, y, stdev, xtype, field, label)
 end
 
 # ╔═╡ fa3f66c2-b52a-48fd-9e49-42e8815880fa
-function plotexp(dfs, x_ax, y_ax, title, label, legendpos=:bottomright)
-	x,y,stdev = prep_data(dfs, x_ax, y_ax, 0.2)
+function plotexp(dfs, 
+				 x_ax, 
+				 y_ax, 
+				 title, 
+				 label, 
+				 legendpos=:bottomright; 
+				 cutofftime=nothing
+				)
+	
+	x,y,stdev = prep_data(dfs, x_ax, y_ax, 0.2; cutofftime=cutofftime)
 	plotexp(x,y,stdev,x_ax, y_ax, title, label, legendpos)
 end
 
 # ╔═╡ 6832f9ac-5105-47fb-a817-c1e5ce5dc6b8
-function plotexp!(dfs, xtype, field, label)
-	x,y,stdev = prep_data(dfs, xtype, field, 0.2)
+function plotexp!(dfs, xtype, field, label; cutofftime=nothing)
+	x,y,stdev = prep_data(dfs, xtype, field, 0.2; cutofftime=cutofftime)
 	plotexp!(x, y, stdev, xtype, field, label)
 end
 
+# ╔═╡ c8b965da-3892-4040-89b3-ea8fdd23a5c6
+plothiro!(pltable, _x, _y, _l; cutofftime=ct) = plothiro!(pltable; cutofftime=ct)
+
+# ╔═╡ 258b40d2-4249-4087-9c75-503ca37ae9b3
+struct Plotable
+	df
+	label
+end
+
+# ╔═╡ 2a3a5e40-c751-42be-b159-dd9c362f0d8e
+function plotexp!(pable::Plotable, xtype, field, label; cutofftime=nothing)
+	plotexp!(pable.df, xtype, field, label; cutofftime=cutofftime)
+end
+
 # ╔═╡ 456f5fd5-ef9c-4691-9c6d-b8ec408d894e
-function plot_tune(exps, title_pref, save_pref)
+function plot_tune(exps, title_pref, save_pref, cut=ct)
 	# PPG -----------------------------------------------------------
-	plotexp(exps.base, "Time (h)", "Test Reward", "$title_pref Policies Per Generation", "256")
-	plotexp!(exps.ppg512, "Time (h)", "Test Reward", "512")
-	plotexp!(exps.ppg1000, "Time (h)", "Test Reward", "1000")
+	plotexp(exps.base, "Time (h)", "Test Reward", "$title_pref Policies Per Generation", "256"; cutofftime=cut)
+	plotexp!(exps.ppg512, "Time (h)", "Test Reward", "512"; cutofftime=cut)
+	plotexp!(exps.ppg1000, "Time (h)", "Test Reward", "1000"; cutofftime=cut)
 
 	savefig("$save_pref/tune/tune_ppg")
 	
 	# EPS -----------------------------------------------------------
-	plotexp(exps.base, "Time (h)", "Test Reward", "$title_pref Episodes Per Policy", "5")
-	plotexp!(exps.ep3, "Time (h)", "Test Reward", "3")
-	plotexp!(exps.ep10, "Time (h)", "Test Reward", "10")
+	plotexp(exps.base, "Time (h)", "Test Reward", "$title_pref Episodes Per Policy", "5"; cutofftime=cut)
+	plotexp!(exps.ep3, "Time (h)", "Test Reward", "3")  # 3 eps ends early
+	# plotexp!(exps.ep10, "Time (h)", "Test Reward", "10"; cutofftime=cut)
 
 	savefig("$save_pref/tune/tune_eps")
 	
 	# cdist ---------------------------------------------------------
-	plotexp(exps.base, "Time (h)", "Test Reward", "$title_pref Target Distance", "4")
-	plotexp!(exps.cd2, "Time (h)", "Test Reward", "2")
-	plotexp!(exps.cd8, "Time (h)", "Test Reward", "8")
+	plotexp(exps.base, "Time (h)", "Test Reward", "$title_pref Target Distance", "4"; cutofftime=cut)
+	plotexp!(exps.cd2, "Time (h)", "Test Reward", "2"; cutofftime=cut)
+	plotexp!(exps.cd8, "Time (h)", "Test Reward", "8"; cutofftime=cut)
 
 	savefig("$save_pref/tune/tune_cdist")
 	
 	# int -----------------------------------------------------------
-	plotexp(exps.base, "Time (h)", "Test Reward", "$title_pref Controller Interval", "25")
-	plotexp!(exps.int10, "Time (h)", "Test Reward", "10")
-	plotexp!(exps.int100, "Time (h)", "Test Reward", "100")
+	plotexp(exps.base, "Time (h)", "Test Reward", "$title_pref Controller Interval", "25"; cutofftime=cut)
+	plotexp!(exps.int10, "Time (h)", "Test Reward", "10"; cutofftime=cut)
+	# plotexp!(exps.int100, "Time (h)", "Test Reward", "100"; cutofftime=cut)
 
 	savefig("$save_pref/tune/tune_int")
 	
 	# lr ------------------------------------------------------------
-	plotexp(exps.base, "Time (h)", "Test Reward", "$title_pref Learning Rate", "0.01")
-	plotexp!(gather_tune.lr01, "Time (h)", "Test Reward", "0.1")
-	plotexp!(exps.lr0001, "Time (h)", "Test Reward", "0.001")
+	# plotexp(exps.base, "Time (h)", "Test Reward", "$title_pref Learning Rate", "0.01"; cutofftime=cut)
+	# plotexp!(exps.lr01, "Time (h)", "Test Reward", "0.1"; cutofftime=cut)
+	# plotexp!(exps.lr0001, "Time (h)", "Test Reward", "0.001"; cutofftime=cut)
 
-	savefig("$save_pref/tune/tune_lr")
+	# savefig("$save_pref/tune/tune_lr")
 
-	# σ -------------------------------------------------------------
+	# # σ -------------------------------------------------------------
 
-	plotexp(exps.base, "Time (h)", "Test Reward", "$title_pref Noise Standard Deviation (σ)", "0.02")
-	plotexp!(exps.sigma02, "Time (h)", "Test Reward", "0.2")
-	plotexp!(exps.sigma0002, "Time (h)", "Test Reward", "0.002")
+	# plotexp(exps.base, "Time (h)", "Test Reward", "$title_pref Noise Standard Deviation (σ)", "0.02"; cutofftime=cut)
+	# plotexp!(exps.sigma02, "Time (h)", "Test Reward", "0.2"; cutofftime=cut)
+	# plotexp!(exps.sigma0002, "Time (h)", "Test Reward", "0.002"; cutofftime=cut)
 
 	savefig("$save_pref/tune/tune_sigma")
 end
 
-# ╔═╡ 015d8f93-a60a-4d5e-a656-0c5e4a58e852
-function plothiro!(dfs)
+# ╔═╡ b297c49a-62ea-440a-9aac-ab5dc1ec4639
+begin 
+	abstract type HiroPlotable end
+	struct HiroGPlotable <: HiroPlotable 
+		df
+	end
+
+	struct HiroMPlotable <: HiroPlotable 
+		df
+	end
+	
+	struct HiroPPlotable <: HiroPlotable 
+		df
+	end
+end
+
+# ╔═╡ 1013578e-e04c-4940-9d99-f05412e61206
+function plothiro!(pltable::HiroGPlotable; cutofftime=ct)
+	dfs = pltable.df
+
+	cuts = [1:findfirst(x -> x / 3600 > cutofftime, df.cumtime) for df in dfs]
+	xs = [df.cumtime[cut] / 3600 for (df, cut) in zip(dfs, cuts)]
+	ys = [fix_main_fit(df[!, "Reward/average_eval_hrl_meta_reward"])[cut] 
+	for (df, cut) in zip(dfs, cuts)]
+	smooth_xs, smooth_ys, smooth_stdev = prep_data(xs, ys, .2)
+	
+	plot!(smooth_xs, smooth_ys, ribbon=smooth_stdev, fillalpha=.5, label="HIRO (ours)")
+end
+
+# ╔═╡ 0b437c56-6d7f-466e-9a25-4f596ee3f31c
+function plothiro!(pltable::HiroMPlotable; cutofftime=ct)
+	dfs = pltable.df
+
+	cuts = [1:findfirst(x -> x / 3600 > cutofftime, df.cumtime) for df in dfs]
 	xs = vcat(
-		[df.cumtime / 3600 for df in dfs],
-		# [df.cumtime / 3600 for df in dfs],
-		# [df.cumtime / 3600 for df in dfs]
+		[df.cumtime[cut] / 3600 for (df, cut) in zip(dfs, cuts)],
+		[df.cumtime[cut] / 3600 for (df, cut) in zip(dfs, cuts)],
+		[df.cumtime[cut] / 3600 for (df, cut) in zip(dfs, cuts)]
 	)
 	ys = vcat(
-		# [fix_main_fit(df[!, "Reward/average_eval1_hrl_success"]) for df in dfs],
-		[fix_main_fit(df[!, "Reward/average_eval2_hrl_success"]) for df in dfs],
-		# [fix_main_fit(df[!, "Reward/average_eval3_hrl_success"]) for df in dfs],
+		[fix_main_fit(df[!, "Reward/average_eval1_hrl_success"][cut]) 
+			for (df, cut) in zip(dfs, cuts)],
+		[fix_main_fit(df[!, "Reward/average_eval2_hrl_success"][cut]) 
+			for (df, cut) in zip(dfs, cuts)],
+		[fix_main_fit(df[!, "Reward/average_eval3_hrl_success"][cut]) 
+			for (df, cut) in zip(dfs, cuts)],
 	)
 
 	smooth_xs, smooth_ys, smooth_stdev = prep_data(xs, ys, .2)
@@ -559,8 +662,105 @@ function plothiro!(dfs)
 	plot!(smooth_xs, smooth_ys, ribbon=smooth_stdev, fillalpha=.5, label="HIRO (ours)")
 end
 
+# ╔═╡ 015d8f93-a60a-4d5e-a656-0c5e4a58e852
+function plothiro!(pltable::HiroPPlotable; cutofftime=ct)
+	dfs = pltable.df
+	
+	cuts = [1:findfirst(x -> x / 3600 > cutofftime, df.cumtime) for df in dfs]
+	xs = [df.cumtime[cut] / 3600 for (df, cut) in zip(dfs, cuts)]
+	ys = [fix_main_fit(df[!, "Reward/average_eval2_hrl_success"][cut]) for (df, cut) in zip(dfs, cuts)]
+
+	smooth_xs, smooth_ys, smooth_stdev = prep_data(xs, ys, .2)
+	|
+	plot!(smooth_xs, smooth_ys, ribbon=smooth_stdev, fillalpha=.5, label="HIRO (ours)")
+end
+
+# ╔═╡ 965d3c00-bdc8-44cb-92bc-9a768cc8dead
+label(p::Plotable) = p.label
+
+# ╔═╡ ec02503b-8025-49a4-bf48-a2a532f17316
+label(p) = nothing
+
+# ╔═╡ 4e3e9c9e-3a4a-4716-a1ac-c116d43d1415
+function multiplot(plottables, x_ax, y_ax, title)
+	 p = plotexp(
+		first(plottables).df, 
+		x_ax,
+		y_ax, 
+		title, 
+		first(plottables).label; 
+		cutofftime=ct
+	)
+	
+	for plottable in plottables[2:end]
+		plt! = plottable isa HiroPlotable ? plothiro! : plotexp!
+		plt!(
+			plottable, 
+			x_ax,
+			y_ax, 
+			label(plottable); 
+			cutofftime=ct
+		)
+	end
+
+	return p
+end
+
+# ╔═╡ dbffbce0-c1a9-4a02-8c5c-401d4740c77a
+struct PlotableGroup  # TODO one node?
+	one
+	two
+	five
+	ten
+	pt
+	ns
+	hiro
+end
+
+# ╔═╡ d0bb02aa-ae78-47b8-a939-d78f42d5cb92
+begin
+	g_plot = Plotable(gather_nohot_dfs, "SHES 48 cores")
+	g_onehot_plot = Plotable(gather_onehot_dfs, "SHES one-hot 48 cores")
+	g_5_plot = Plotable(gather_5_dfs, "SHES 120 cores")
+	g_10_plot = Plotable(gather_10_dfs, "SHES 240 cores")
+	g_pt_plot = Plotable(gather_pt_dfs, "SHES-TL")
+	g_hiro_plot = HiroGPlotable(hiro_gather)
+	g_pables = PlotableGroup(nothing, g_plot, g_5_plot, g_10_plot, g_pt_plot, nothing, g_hiro_plot)
+	
+	m_plot = Plotable(maze_dfs, "SHES 48 cores")
+	m_5_plot = Plotable(maze_5node_dfs, "SHES 120 cores")
+	m_10_plot = Plotable(maze_10node_dfs, "SHES 240 cores")
+	m_pt_plot = Plotable(maze_pt_dfs, "SHES-TL")
+	m_hiro_plot = HiroMPlotable(hiro_maze)
+	m_pables = PlotableGroup(nothing, m_plot, m_5_plot, m_10_plot, m_pt_plot, nothing, m_hiro_plot)
+
+	p_plot = Plotable(push_dfs, "SHES 48 cores")
+	p_5_plot = Plotable(push_5node_dfs, "SHES 120 cores")
+	p_10_plot = Plotable(push_10node_dfs, "SHES 240 cores")
+	p_pt_plot = Plotable(push_pt_dfs, "SHES-TL")
+	p_hiro_plot = HiroPPlotable(hiro_push)
+	p_pables = PlotableGroup(nothing, p_plot, p_5_plot, p_10_plot, p_pt_plot, nothing, p_hiro_plot)
+
+	"Plotables"
+end
+
+# ╔═╡ d18d3765-3c63-4ce7-9a69-3b820442f161
+plotmain(pable; yax=TR) = multiplot([pable.two, pable.ten, pable.hiro], TIME, yax, "SHES vs gradient based methods")
+
+# ╔═╡ 15f7aceb-8388-4d2d-9a8b-0f4a87f2f656
+plotnodes(pable; yax=TR) = multiplot([pable.two, pable.five, pable.ten], TIME, yax, "SHES Multicore comparison")
+
+# ╔═╡ 507a87b4-47ec-4cdf-80ca-6f7e87afb876
+plotexts(pable; yax=TR) = multiplot([pable.two, pable.pt], TIME, yax, "SHES vs Extensions")
+
+# ╔═╡ 8090773f-e2c3-4c44-8428-d7284221050d
+plotnodes(m_pables;yax=CR)
+
 # ╔═╡ b6dd438c-4e57-4b52-a1f5-98d29f16acc6
 md"# Ant gather"
+
+# ╔═╡ f9551d45-b4c1-43a4-a76e-afd7ff53bd95
+
 
 # ╔═╡ fafa619c-8187-4ffe-a6ec-994957dfb7d4
 md"### Tune"
@@ -575,36 +775,43 @@ md"### Test reward"
 begin
 	t1 = "Ant Gather: Test Reward Per Environment Steps"
 
-	all_nohot_dfs = vcat(gather_nohot_dfs, gather_5_dfs, gather_10_dfs)
-	gx, gy, gstd = prep_data(all_nohot_dfs, "Samples", "Test Reward", 0.2)
-	gcutoff = 1:900
+	# all_nohot_dfs = vcat(gather_nohot_dfs, gather_5_dfs, gather_10_dfs)
 	
-	plotexp(gx[gcutoff], gy[gcutoff], gstd[gcutoff], "Samples", "Test Reward", t1, "SHES")
-	plotexp!(gather_onehot_dfs, "Samples", "Test Reward", "SHES one-hot")
+	plotexp(gather_nohot_dfs, "Samples", "Test Reward", t1, "SHES"; cutofftime=ct)
+	plotexp!(gather_onehot_dfs, "Samples", "Test Reward", "SHES one-hot"; cutofftime=ct)
 
-	gather_other_xs = [0, 4e9]
+	gather_other_xs = [0, 1.68e9]
 	plot!(gather_other_xs, [3.02, 3.02], label="HIRO (theirs)")
 	plot!(gather_other_xs, [0.85, 0.85], label="FuN")
 	plot!(gather_other_xs, [1.92, 1.92], label="SNN4HRL")
 	plot!(gather_other_xs, [1.42, 1.42], label="VIME")
 
-	savefig("imgs/gather/gather-tr-steps")
+	# savefig("imgs/gather/gather-tr-steps")
 end
+
+# ╔═╡ 0ba44efd-637e-4d23-8236-ffd3207f549c
+multiplot([g_plot, g_onehot_plot], TIME, TR, "Ant Gather: SHES vs SHES-onehot")
 
 # ╔═╡ 0fa2bbcd-0b9e-4f79-8679-0e7d698d0068
 begin
-	t5 = "Ant Gather: Test Reward Per Wall Clock Time"
+	t5 = "Ant Gather: Test Score"
 	
-	plotexp(gather_nohot_dfs, "Time (h)", "Test Reward", t5, "SHES 48 cores")
-	# plotexp!(gather_onehot_dfs, "Time (h)", "Test Reward", "SHES one-hot")
-	plotexp!(gather_5_dfs, "Time (h)", "Test Reward", "SHES 120 cores")
-	plotexp!(gather_10_dfs, "Time (h)", "Test Reward", "SHES 240 cores")
+	plotexp(gather_nohot_dfs, "Time (h)", "Test Reward", t5, "SHES 48 cores", :bottomright; cutofftime=ct)
 
-	gather_other_xs2 = [0, 24]
+	# plotexp!(gather_onehot_dfs, "Time (h)", "Test Reward", "SHES one-hot"; cutofftime=ct)
+	# plotexp!(gather_5_dfs, "Time (h)", "Test Reward", "SHES 120 cores";)
+	plotexp!(gather_10_dfs, "Time (h)", "Test Reward", "SHES 240 cores"; cutofftime=ct)
+
+	# plotexp!(gather_pt_dfs, "Time (h)", "Test Reward", "Pretrained"; cutofftime=ct)
+
+
+	plothiro_gather!(hiro_gather)
+	
+	gather_other_xs2 = [0, ct]
 	plot!(gather_other_xs2, [3.02, 3.02], label="HIRO (theirs)")
 	plot!(gather_other_xs2, [0.85, 0.85], label="FuN")
-	plot!(gather_other_xs2, [1.92, 1.92], label="SNN4HRL")
-	plot!(gather_other_xs2, [1.42, 1.42], label="VIME")
+	# plot!(gather_other_xs2, [1.92, 1.92], label="SNN4HRL")
+	# plot!(gather_other_xs2, [1.42, 1.42], label="VIME")
 
 	savefig("imgs/gather/gather-tr-time")
 end
@@ -614,13 +821,13 @@ md"### Pretraining+NS"
 
 # ╔═╡ a49117d2-562f-4af2-be5e-9f56423fe9c0
 begin
-	t4 = "Ant Gather: Pretrained vs Novelty vs Base SHES"
+	t4 = "Ant Gather: Training Reward"
 	
-	plotexp(gather_nohot_dfs, "Time (h)", "Test Reward", t4, "SHES")
-	plotexp!(gather_pretrained_dfs, "Time (h)", "Test Reward", "Pretrained")
-	plotexp!(gather_ns_dfs, "Time (h)", "Test Reward", "Novelty")
+	plotexp(gather_nohot_dfs, "Time (h)", CR, t4, "SHES 48 cores"; cutofftime=ct)
+	plotexp!(gather_pt_dfs, "Time (h)", CR, "SHES-TL 48 cores"; cutofftime=ct)
+	# plotexp!(gather_ns_dfs, "Time (h)", "Test Reward", "Novelty"; cutofftime=ct)
 	
-	savefig("imgs/gather/gather-pt-ns")
+	savefig("imgs/gather/gather-tl")
 end
 
 # ╔═╡ 9c6878e0-741d-4030-9d4a-94fa40184221
@@ -630,10 +837,10 @@ md"### Train reward"
 begin
 	t3 = "Ant Gather: Mean Primitive Training Reward"
 	
-	plotexp(gather_nohot_dfs, "Time (h)", "Mean Primitive Reward", t3, "SHES")
-	plotexp!(gather_onehot_dfs, "Time (h)", "Mean Primitive Reward", "SHES one-hot")
-	plotexp!(gather_ns_dfs, "Time (h)", "Mean Primitive Reward", "NS")
-	plotexp!(gather_pretrained_dfs, "Time (h)", "Mean Primitive Reward", "Pretrain")
+	plotexp(gather_nohot_dfs, "Time (h)", "Mean Primitive Reward", t3, "SHES"; cutofftime=ct)
+	plotexp!(gather_onehot_dfs, "Time (h)", "Mean Primitive Reward", "SHES one-hot"; cutofftime=ct)
+	plotexp!(gather_ns_dfs, "Time (h)", "Mean Primitive Reward", "NS"; cutofftime=ct)
+	plotexp!(gather_pretrained_dfs, "Time (h)", "Mean Primitive Reward", "Pretrain"; cutofftime=ct)
 
 	savefig("imgs/gather/gather-prim")
 end
@@ -654,13 +861,7 @@ md"### Test reward"
 begin
 	t2 = "Ant Maze: Test Reward Per Environmental Steps"
 
-	all_maze_dfs = vcat(maze_dfs, maze_5node_dfs, maze_10node_dfs)
-	
-	# all_maze_dfs[1] has an uptick right at the end which throws off interp
-	mx, my, mstd = prep_data(all_maze_dfs, "Samples", "Test Reward", 0.2)
-	mcutoff = 1:1650  
-	
-	plotexp(mx[mcutoff], my[mcutoff], mstd[mcutoff], "Samples", "Test Reward", t2, "SHES", :topright)
+	plotexp(all_maze_dfs, "Samples", "Test Reward", t2, "SHES", :topright; cutofftime=ct)
 
 	maze_other_xs = [0, 8e9] 
 	plot!(maze_other_xs, [0.99,0.99], label="HIRO (theirs)")
@@ -672,17 +873,19 @@ end
 
 # ╔═╡ b48b0893-266b-4937-af92-16045dcec171
 begin
-	t7 = "Ant Maze: Test Reward Per Wall Clock Time"
+	t7 = "Ant Maze: Test Score"
 	
-	plotexp(maze_dfs, "Time (h)", "Test Reward", t7, "SHES", :topright)
-	plotexp!(maze_5node_dfs, "Time (h)", "Test Reward", "120")
-	plotexp!(maze_10node_dfs, "Time (h)", "Test Reward", "240")
+	plotexp(maze_dfs, "Time (h)", "Test Reward", t7, "SHES 48 cores", :right; cutofftime=ct)
+	# plotexp!(maze_5node_dfs, "Time (h)", "Test Reward", "120"; cutofftime=ct)
+	plotexp!(maze_10node_dfs, "Time (h)", "Test Reward", "SHES 240 cores")
 
-	plothiro!(hiro_maze[1:7])
+	plothiro_maze!(hiro_maze[1:7])
 
-	maze_other_xs2 = [0, 23.85]
+	maze_other_xs2 = [0, ct]
+	plot!(maze_other_xs2, [0.99, 0.99], label="HIRO")
+
 	plot!(maze_other_xs2, [0.16, 0.16], label="FuN")
-	plot!(maze_other_xs2, [0, 0], label="SNN4HRL+VIME")
+	# plot!(maze_other_xs2, [0, 0], label="SNN4HRL+VIME")
 
 	savefig("imgs/maze/maze-tr-time")
 end
@@ -692,13 +895,13 @@ md"### Train Reward"
 
 # ╔═╡ 8de599b3-39a1-4e7c-af38-f1e40864d059
 begin
-	t8 = "Ant Maze: Mean Primitive Training Reward"
+	t8 = "Ant Maze: Training Reward"
 	
-	plotexp(maze_dfs, "Time (h)", "Mean Primitive Reward", t8, "SHES")
-	plotexp!(maze_pt_dfs, "Time (h)", "Mean Primitive Reward", "PT")
-	plotexp!(maze_ns_dfs, "Time (h)", "Mean Primitive Reward", "NS")
+	plotexp(maze_dfs, "Time (h)", "Mean Controller Reward", t8, "SHES 48 cores"; cutofftime=ct)
+	plotexp!(maze_pt_dfs, "Time (h)", "Mean Controller Reward", "SHES-TL 48 cores"; cutofftime=7.5)
+	# plotexp!(maze_ns_dfs, "Time (h)", "Mean Primitive Reward", "NS"; cutofftime=ct)
 	
-	savefig("imgs/maze/maze-prim")
+	savefig("imgs/maze/maze-pt-train")
 end
 
 # ╔═╡ 4c4c7482-867b-474c-abea-8dc9ea82c890
@@ -708,11 +911,11 @@ md"### Pretrain + NS"
 begin
 	t9 = "Ant Maze: Pretrained vs Novelty vs Base SHES"
 	
-	plotexp(maze_dfs, "Time (h)", "Test Reward", t9, "SHES")
+	plotexp(maze_dfs, "Time (h)", "Test Reward", t9, "SHES"; cutofftime=ct)
 	plotexp!(maze_pt_dfs, "Time (h)", "Test Reward", "Pretrained")
-	plotexp!(maze_ns_dfs, "Time (h)", "Test Reward", "NS")
+	# plotexp!(maze_ns_dfs, "Time (h)", "Test Reward", "NS"; cutofftime=ct)
 	
-	savefig("imgs/maze/maze-pt-ns")
+	# savefig("imgs/maze/maze-pt-test")
 end
 
 # ╔═╡ 09bfe3f2-3a07-4701-a169-76d6b12490ba
@@ -724,6 +927,9 @@ md"### Tune"
 # ╔═╡ e23d4c2f-620f-4fc4-b56a-0a285639e4ea
 plot_tune(maze_tune, "Ant Maze:", "imgs/maze")
 
+# ╔═╡ be0d4809-3b6a-4985-bb2c-117c14bd31bb
+map(df -> maximum(df[!, "Time (h)"]), maze_tune.ppg512)
+
 # ╔═╡ a16e058e-728e-4a24-a21a-aaafb5a6c183
 md"# Ant Push"
 
@@ -734,10 +940,9 @@ md"### Test Reward"
 begin
 	t11 = "Ant Push: Test Reward Per Environmental Steps"
 
-	all_push_dfs = vcat(push_dfs, push_5node_dfs, push_10node_dfs)
-	plotexp(all_push_dfs, "Samples", "Test Reward", t11, "SHES (any processors)")
+	plotexp(all_push_dfs, "Samples", "Test Reward", t11, "SHES (any processors)"; cutofftime=ct)
 	
-	push_other_xs = [0, 8.45e9]
+	push_other_xs = [0, 7.63e9]
 	plot!(push_other_xs, [0.92,0.92], label="HIRO")
 	plot!(push_other_xs, [0.56, 0.56], label="FuN")
 	plot!(push_other_xs, [0.02, 0.02], label="SNN4HRL+VIME")
@@ -747,20 +952,18 @@ end
 
 # ╔═╡ 947dcf8c-3799-47d7-9d78-1058e111ea60
 begin
-	t12 = "Ant Push: Test Reward Per Wall Clock Time"
+	t12 = "Ant Push: Test Score"
 
-	plotexp(push_dfs, "Time (h)", "Test Reward", t12, "SHES 48 cores")
+	plotexp(push_dfs, "Time (h)", "Test Reward", t12, "SHES 48 cores"; cutofftime=ct)
+	# plotexp!(push_5node_dfs, "Time (h)", "Test Reward", "SHES 120 cores"; cutofftime=ct)
+	plotexp!(push_10node_dfs, "Time (h)", "Test Reward", "SHES 240 cores"; cutofftime=ct)
+	# plotexp!(push_pt_dfs, "Time (h)", "Test Reward", "SHES-TL 48 cores")
 
-	# did too many gens of 5 node
-	x, y, stdev = prep_data(push_5node_dfs, "Time (h)", "Test Reward", 0.2)
-	cutoff = 1:1619
-	plotexp!(x[cutoff],y[cutoff],stdev[cutoff], "Time (h)", "Test Reward", "SHES 120 cores")
-
-	plothiro!(hiro_push)
-	push_other_xs_t = [0, 11.98]
+	plothiro_push!(hiro_push; cutofftime=9.92)
+	push_other_xs_t = [0, ct]
 	plot!(push_other_xs_t, [0.92,0.92], label="HIRO")
 	plot!(push_other_xs_t, [0.16, 0.16], label="FuN")
-	plot!(push_other_xs_t, [0, 0], label="SNN4HRL+VIME")
+	# plot!(push_other_xs_t, [0, 0], label="SNN4HRL+VIME")
 
 	savefig("imgs/push/push-tr-time")
 end
@@ -770,13 +973,13 @@ md"### Pretrain + NS"
 
 # ╔═╡ 48f0f7c3-1492-4d94-a755-58ede5b3d3fd
 begin
-	t13 = "Ant Push: Pretrained vs Novelty vs Base SHES"
+	t13 = "Ant Push: Training Reward"
 	
-	plotexp(push_dfs, "Samples", "Test Reward", t13, "SHES")
-	plotexp!(push_pt_dfs, "Samples", "Test Reward", "Pretrained")
-	plotexp!(push_ns_dfs, "Samples", "Test Reward", "NS")
+	plotexp(push_dfs, "Time (h)", CR, t13, "SHES 48 cores")
+	plotexp!(push_pt_dfs, "Time (h)", CR, "SHES-TL 48 cores")
+	# plotexp!(push_ns_dfs, "Samples", "Test Reward", "NS")
 	
-	savefig("imgs/push/push-ns-pt")
+	savefig("imgs/push/push-tl")
 end
 
 # ╔═╡ 07861635-0ce0-4315-9259-91956e6f5f1a
@@ -800,16 +1003,13 @@ md"### Speedup"
 md"### Tune"
 
 # ╔═╡ 868412e5-f725-415b-a7ab-d6bed0e15b13
-plot_tune(push_tune, "Ant Push:", "imgs/push")
+plot_tune(push_tune, "Ant Push:", "imgs/push", 1)
 
 # ╔═╡ fbb132aa-4f45-4f22-9339-25511aaa840b
 md"##### Scratch"
 
 # ╔═╡ 8d5baceb-f1e3-451a-92d5-cfabebaea4e7
-begin
-	# x, y, _ = prep_data(gather_nohot_dfs, "Samples", "Test Reward", 0.01)
-	mean_interp(gather_onehot_dfs, "Samples", "Test Reward", inv=false)(3.9e9)
-end
+mean_interp(push_10node_dfs, "Time (h)", "Test Reward", inv=true)(0.92)
 
 # ╔═╡ a1cd331f-2d70-4802-8d76-7038268da1e7
 begin
@@ -825,11 +1025,79 @@ function inc_run_names(path, inc)
 	end
 end
 
+# ╔═╡ 28449291-d39e-4fae-bb16-7faacd8f9da0
+# inc_run_names("../ScalableHrlEs/tensorboard_logs/remote/maze/tune/new/", 3)
+
+# ╔═╡ cfdeb877-0ffa-4bc6-8d28-0478734f593e
+begin
+	g_48_mgt = mean_gt(gather_nohot_dfs)
+	g_1_mgt = mean_gt(gather_single_df)
+	g_240_mgt = mean_gt(gather_10_dfs)
+
+	# plot([1,240], [1,240], title="Speedup vs core count", label="Linear speedup", yaxis=:log, xaxis=:log, legend=:topleft)
+	plot([1,240], [1,240], title="Speedup vs core count", label="Linear speedup", legend=:topleft)
+	plot!([1, 48, 240], g_1_mgt ./ [g_1_mgt, g_48_mgt, g_240_mgt], label="SHES speedup")
+	xlabel!("Speedup")
+	ylabel!("Cores")
+
+	savefig("imgs/speedup")
+end
+
+# ╔═╡ 4aeea9c5-5ffd-465f-8a11-65d2feba1286
+begin
+	m_1_mgt = mean_gt(maze_single_df)
+	m_24_mgt = mean_gt(maze_tune.ppg1000)
+	m_48_mgt = mean_gt(maze_dfs)
+	m_240_mgt = mean_gt(maze_10node_dfs)
+
+	plot([1,240], [1,240])
+	plot!([1, 24,  48, 240], m_1_mgt ./ [m_1_mgt, m_24_mgt, m_48_mgt, m_240_mgt] )
+end
+
+# ╔═╡ 04cd450c-d04d-41a8-9e3e-add8c407a9b8
+begin
+	p_48_mgt = mean_gt(push_dfs)
+	p_1_mgt = mean_gt(push_single_df)
+	p_240_mgt = mean_gt(push_10node_dfs)
+
+	plot([1,240], [1,240])
+	plot!([1, 48, 240], p_1_mgt ./ [p_1_mgt, p_48_mgt, p_240_mgt] )
+end
+
+# ╔═╡ 3470328c-77bc-4dfd-952c-51346bb743c5
+begin
+	# base
+	gather_max = [maximum(df[!, "Test Reward"]) for df in all_nohot_dfs]
+	# maze_max = [maximum(df[!, "Test Reward"]) for df in all_maze_dfs]
+	push_max = [maximum(df[!, "Test Reward"]) for df in all_push_dfs]
+
+	# exts
+	gather_pt_max = [maximum(df[!, "Test Reward"]) for df in gather_pt_dfs]
+	# gather_ns_max = [maximum(df[!, "Test Reward"]) for df in gather_ns_dfs]
+
+	# maze_pt_max = [maximum(df[!, "Test Reward"]) for df in maze_pt_dfs]
+	# maze_ns_max = [maximum(df[!, "Test Reward"]) for df in maze_ns_dfs]
+
+	push_pt_max = [maximum(df[!, "Test Reward"]) for df in push_pt_dfs]
+	# push_ns_max = [maximum(df[!, "Test Reward"]) for df in push_ns_dfs]
+
+	# hiro
+	hiro_gather_max = [maximum(df[!, "Reward/average_eval_hrl_meta_reward"]) for df in hiro_gather]
+	hiro_push_max = [maximum(df[!, "Reward/average_eval2_hrl_success"]) for df in hiro_push]
+	hiro_maze_max = [maximum(df[!, "Reward/average_eval$(i)_hrl_success"]) for df in hiro_maze for i in 1:3]
+		
+	MannWhitneyUTest(gather_max, gather_pt_max)  # reject = one of the two vals are bigger
+end
+
+# ╔═╡ 9e27690c-0557-468b-a754-ba051c0e581c
+[maximum(df[!, "Test Reward"]) for df in push_10node_dfs] / 0.92
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+HypothesisTests = "09f84164-cd44-5f33-b23f-e6b0d136a0d5"
 Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
 Loess = "4345ca2d-374a-55d4-8d30-97f9976e7612"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
@@ -838,6 +1106,7 @@ Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 [compat]
 CSV = "~0.9.11"
 DataFrames = "~1.3.1"
+HypothesisTests = "~0.10.6"
 Interpolations = "~0.13.5"
 Loess = "~0.5.4"
 Plots = "~1.25.3"
@@ -922,6 +1191,16 @@ git-tree-sha1 = "417b0ed7b8b838aa6ca0a87aadf1bb9eb111ce40"
 uuid = "5ae59095-9a9b-59fe-a467-6f913c188581"
 version = "0.12.8"
 
+[[Combinatorics]]
+git-tree-sha1 = "08c8b6831dc00bfea825826be0bc8336fc369860"
+uuid = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
+version = "1.0.2"
+
+[[CommonSolve]]
+git-tree-sha1 = "68a0743f578349ada8bc911a5cbd5a2ef6ed6d1f"
+uuid = "38540f10-b2f7-11e9-35d8-d573e4eb0ff2"
+version = "0.2.0"
+
 [[Compat]]
 deps = ["Base64", "Dates", "DelimitedFiles", "Distributed", "InteractiveUtils", "LibGit2", "Libdl", "LinearAlgebra", "Markdown", "Mmap", "Pkg", "Printf", "REPL", "Random", "SHA", "Serialization", "SharedArrays", "Sockets", "SparseArrays", "Statistics", "Test", "UUIDs", "Unicode"]
 git-tree-sha1 = "44c37b4636bc54afac5c574d2d02b625349d6582"
@@ -931,6 +1210,12 @@ version = "3.41.0"
 [[CompilerSupportLibraries_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
+
+[[ConstructionBase]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "f74e9d5388b8620b4cee35d4c5a618dd4dc547f4"
+uuid = "187b0558-2788-49d3-abe0-74a17ed4e7c9"
+version = "1.3.0"
 
 [[Contour]]
 deps = ["StaticArrays"]
@@ -973,6 +1258,12 @@ uuid = "ade2ca70-3891-5945-98fb-dc099432e06a"
 deps = ["Mmap"]
 uuid = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 
+[[DensityInterface]]
+deps = ["InverseFunctions", "Test"]
+git-tree-sha1 = "80c3e8639e3353e5d2912fb3a1916b8455e2494b"
+uuid = "b429d917-457f-4dbc-8f4c-0cc954292b1d"
+version = "0.4.0"
+
 [[Distances]]
 deps = ["LinearAlgebra", "SparseArrays", "Statistics", "StatsAPI"]
 git-tree-sha1 = "3258d0659f812acde79e8a74b11f17ac06d0ca04"
@@ -982,6 +1273,12 @@ version = "0.10.7"
 [[Distributed]]
 deps = ["Random", "Serialization", "Sockets"]
 uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
+
+[[Distributions]]
+deps = ["ChainRulesCore", "DensityInterface", "FillArrays", "LinearAlgebra", "PDMats", "Printf", "QuadGK", "Random", "SparseArrays", "SpecialFunctions", "Statistics", "StatsBase", "StatsFuns", "Test"]
+git-tree-sha1 = "6a8dc9f82e5ce28279b6e3e2cea9421154f5bd0d"
+uuid = "31c24e10-a181-5473-b8eb-7969acd0382f"
+version = "0.25.37"
 
 [[DocStringExtensions]]
 deps = ["LibGit2"]
@@ -1022,6 +1319,12 @@ deps = ["Compat", "Dates", "Mmap", "Printf", "Test", "UUIDs"]
 git-tree-sha1 = "04d13bfa8ef11720c24e4d840c0033d145537df7"
 uuid = "48062228-2e41-5def-b9a4-89aafe57970f"
 version = "0.9.17"
+
+[[FillArrays]]
+deps = ["LinearAlgebra", "Random", "SparseArrays", "Statistics"]
+git-tree-sha1 = "8756f9935b7ccc9064c6eef0bff0ad643df733a3"
+uuid = "1a297f60-69ca-5386-bcde-b61e274b549b"
+version = "0.12.7"
 
 [[FixedPointNumbers]]
 deps = ["Statistics"]
@@ -1115,6 +1418,12 @@ deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll",
 git-tree-sha1 = "129acf094d168394e80ee1dc4bc06ec835e510a3"
 uuid = "2e76f6c2-a576-52d4-95c1-20adfe4de566"
 version = "2.8.1+1"
+
+[[HypothesisTests]]
+deps = ["Combinatorics", "Distributions", "LinearAlgebra", "Random", "Rmath", "Roots", "Statistics", "StatsBase"]
+git-tree-sha1 = "dc9bb7abfa265e0cf030635315184a476a2dd5f3"
+uuid = "09f84164-cd44-5f33-b23f-e6b0d136a0d5"
+version = "0.10.6"
 
 [[IniFile]]
 deps = ["Test"]
@@ -1344,15 +1653,25 @@ version = "1.10.8"
 
 [[Ogg_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
-git-tree-sha1 = "7937eda4681660b4d6aeeecc2f7e1c81c8ee4e2f"
+git-tree-sha1 = "887579a3eb005446d514ab7aeac5d1d027658b8f"
 uuid = "e7412a2a-1a6e-54c0-be00-318e2571c051"
-version = "1.3.5+0"
+version = "1.3.5+1"
+
+[[OpenLibm_jll]]
+deps = ["Artifacts", "Libdl"]
+uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
 
 [[OpenSSL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "15003dcb7d8db3c6c857fda14891a539a8f2705a"
 uuid = "458c3c95-2e84-50aa-8efc-19380b2a3a95"
 version = "1.1.10+0"
+
+[[OpenSpecFun_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "13652491f6856acfd2db29360e1bbcd4565d04f1"
+uuid = "efe28fd5-8261-553b-a9e1-b2916fc3738e"
+version = "0.5.5+0"
 
 [[Opus_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1370,6 +1689,12 @@ deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "b2a7af664e098055a7529ad1a900ded962bca488"
 uuid = "2f80f16e-611a-54ab-bc61-aa92de5b98fc"
 version = "8.44.0+0"
+
+[[PDMats]]
+deps = ["LinearAlgebra", "SparseArrays", "SuiteSparse"]
+git-tree-sha1 = "ee26b350276c51697c9c2d88a072b339f9f03d73"
+uuid = "90014a1f-27ba-587c-ab20-58faa44d9150"
+version = "0.11.5"
 
 [[Parsers]]
 deps = ["Dates"]
@@ -1433,6 +1758,12 @@ git-tree-sha1 = "ad368663a5e20dbb8d6dc2fddeefe4dae0781ae8"
 uuid = "ea2cea3b-5b76-57ae-a6ef-0a8af62496e1"
 version = "5.15.3+0"
 
+[[QuadGK]]
+deps = ["DataStructures", "LinearAlgebra"]
+git-tree-sha1 = "78aadffb3efd2155af139781b8a8df1ef279ea39"
+uuid = "1fd47b50-473d-5c70-9696-f719f8f3bcdc"
+version = "2.4.2"
+
 [[REPL]]
 deps = ["InteractiveUtils", "Markdown", "Sockets", "Unicode"]
 uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
@@ -1469,6 +1800,24 @@ git-tree-sha1 = "8f82019e525f4d5c669692772a6f4b0a58b06a6a"
 uuid = "ae029012-a4dd-5104-9daa-d747884805df"
 version = "1.2.0"
 
+[[Rmath]]
+deps = ["Random", "Rmath_jll"]
+git-tree-sha1 = "bf3188feca147ce108c76ad82c2792c57abe7b1f"
+uuid = "79098fc4-a85e-5d69-aa6a-4863f24498fa"
+version = "0.7.0"
+
+[[Rmath_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "68db32dff12bb6127bac73c209881191bf0efbb7"
+uuid = "f50d1b31-88e8-58de-be2c-1cc44531875f"
+version = "0.3.0+0"
+
+[[Roots]]
+deps = ["CommonSolve", "Printf", "Setfield"]
+git-tree-sha1 = "ee885e0f773804f046fd43d0d4ace305b3d540e2"
+uuid = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
+version = "1.3.13"
+
 [[SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
 
@@ -1486,6 +1835,12 @@ version = "1.3.10"
 
 [[Serialization]]
 uuid = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
+
+[[Setfield]]
+deps = ["ConstructionBase", "Future", "MacroTools", "Requires"]
+git-tree-sha1 = "0afd9e6c623e379f593da01f20590bacc26d1d14"
+uuid = "efcf1570-3423-57d1-acb7-fd33fddbac46"
+version = "0.8.1"
 
 [[SharedArrays]]
 deps = ["Distributed", "Mmap", "Random", "Serialization"]
@@ -1510,6 +1865,12 @@ version = "1.0.1"
 deps = ["LinearAlgebra", "Random"]
 uuid = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
+[[SpecialFunctions]]
+deps = ["ChainRulesCore", "IrrationalConstants", "LogExpFunctions", "OpenLibm_jll", "OpenSpecFun_jll"]
+git-tree-sha1 = "e08890d19787ec25029113e88c34ec20cac1c91e"
+uuid = "276daf66-3868-5448-9aa4-cd146d93841b"
+version = "2.0.0"
+
 [[StaticArrays]]
 deps = ["LinearAlgebra", "Random", "Statistics"]
 git-tree-sha1 = "3c76dde64d03699e074ac02eb2e8ba8254d428da"
@@ -1531,11 +1892,21 @@ git-tree-sha1 = "2bb0cb32026a66037360606510fca5984ccc6b75"
 uuid = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 version = "0.33.13"
 
+[[StatsFuns]]
+deps = ["ChainRulesCore", "InverseFunctions", "IrrationalConstants", "LogExpFunctions", "Reexport", "Rmath", "SpecialFunctions"]
+git-tree-sha1 = "bedb3e17cc1d94ce0e6e66d3afa47157978ba404"
+uuid = "4c63d2b9-4356-54db-8cca-17b64c39e42c"
+version = "0.9.14"
+
 [[StructArrays]]
 deps = ["Adapt", "DataAPI", "StaticArrays", "Tables"]
 git-tree-sha1 = "2ce41e0d042c60ecd131e9fb7154a3bfadbf50d3"
 uuid = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
 version = "0.6.3"
+
+[[SuiteSparse]]
+deps = ["Libdl", "LinearAlgebra", "Serialization", "SparseArrays"]
+uuid = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 
 [[TOML]]
 deps = ["Dates"]
@@ -1816,22 +2187,27 @@ version = "0.9.1+5"
 # ╔═╡ Cell order:
 # ╠═cd33cc66-1df7-11ec-102a-d5816d93431c
 # ╠═b29d2430-3950-4544-8daf-57be549a690f
-# ╠═bdbd896d-0761-4d30-82ab-928889953d3f
-# ╟─3163445d-ce5e-424a-961a-5ca03a34f177
+# ╟─1b4dc0db-9f47-4a94-9bbc-b70c30972997
+# ╟─006035ef-08f6-4f9f-9dfb-043abfaf6af6
+# ╟─c1dae931-ab39-4d98-bb9d-0453ce0e9e52
+# ╟─a36250ad-7318-4e57-a6ae-c36e782d2214
+# ╟─7df4d38a-4b25-437c-975c-78010c3729c1
+# ╟─bdbd896d-0761-4d30-82ab-928889953d3f
+# ╠═3163445d-ce5e-424a-961a-5ca03a34f177
 # ╟─27ea31d5-52ab-4186-8859-48e912abbe07
 # ╟─1341a522-35b1-4d12-acc5-5455cff02992
 # ╟─a28bbacf-5fa1-4a60-9ac5-66ca96dd0765
 # ╟─4bab0152-d53f-4bb9-a38a-49930797c632
 # ╟─ec291a04-df1a-4b4a-89e1-6e15d5c6b8d2
-# ╟─9f9e14fe-8568-48c2-9106-4e265bc284d8
+# ╠═9f9e14fe-8568-48c2-9106-4e265bc284d8
 # ╟─5aa5ddd3-e896-47e7-bdd1-effda634168e
 # ╠═bed86641-3ef4-48f9-b27b-b7a98da0d2eb
-# ╠═593931df-9fba-4548-ad2b-b48e8abec8ba
+# ╟─593931df-9fba-4548-ad2b-b48e8abec8ba
 # ╟─35dc88a2-9b9a-4d57-8036-ca198020276c
-# ╠═519e5b4f-d204-4f3a-b473-52e45ec796f4
+# ╟─519e5b4f-d204-4f3a-b473-52e45ec796f4
 # ╟─8e03a713-5bb2-44c6-a61b-7fdbf7ea41a5
 # ╟─23463959-ea89-4276-80a1-92cb3ff105b0
-# ╠═08ee1e2d-0f88-4692-b9d8-62301cb06aa9
+# ╟─08ee1e2d-0f88-4692-b9d8-62301cb06aa9
 # ╟─0b2d3f1c-3a78-4d7a-94dd-5eab9118faa2
 # ╟─f91781de-3d67-48f5-b82a-90d91e105812
 # ╟─7d484f3b-57b6-4ea7-84d6-91be70916021
@@ -1840,16 +2216,33 @@ version = "0.9.1+5"
 # ╟─fc226d0f-5c1b-4eb8-a725-4b45d7151c97
 # ╠═b9f2c016-93e1-440d-88c3-3f30921de1bd
 # ╟─468a639c-8a6c-417e-bac6-29c770a640f1
-# ╟─c4460ecb-31a8-439a-b7d7-3f08068926f0
+# ╠═c4460ecb-31a8-439a-b7d7-3f08068926f0
 # ╟─fa3f66c2-b52a-48fd-9e49-42e8815880fa
-# ╟─6832f9ac-5105-47fb-a817-c1e5ce5dc6b8
+# ╠═6832f9ac-5105-47fb-a817-c1e5ce5dc6b8
+# ╠═2a3a5e40-c751-42be-b159-dd9c362f0d8e
 # ╟─456f5fd5-ef9c-4691-9c6d-b8ec408d894e
-# ╠═015d8f93-a60a-4d5e-a656-0c5e4a58e852
+# ╠═c8b965da-3892-4040-89b3-ea8fdd23a5c6
+# ╟─1013578e-e04c-4940-9d99-f05412e61206
+# ╟─0b437c56-6d7f-466e-9a25-4f596ee3f31c
+# ╟─015d8f93-a60a-4d5e-a656-0c5e4a58e852
+# ╠═258b40d2-4249-4087-9c75-503ca37ae9b3
+# ╟─b297c49a-62ea-440a-9aac-ab5dc1ec4639
+# ╟─965d3c00-bdc8-44cb-92bc-9a768cc8dead
+# ╟─ec02503b-8025-49a4-bf48-a2a532f17316
+# ╠═4e3e9c9e-3a4a-4716-a1ac-c116d43d1415
+# ╠═dbffbce0-c1a9-4a02-8c5c-401d4740c77a
+# ╟─d0bb02aa-ae78-47b8-a939-d78f42d5cb92
+# ╠═d18d3765-3c63-4ce7-9a69-3b820442f161
+# ╠═15f7aceb-8388-4d2d-9a8b-0f4a87f2f656
+# ╠═507a87b4-47ec-4cdf-80ca-6f7e87afb876
+# ╠═8090773f-e2c3-4c44-8428-d7284221050d
 # ╟─b6dd438c-4e57-4b52-a1f5-98d29f16acc6
+# ╠═f9551d45-b4c1-43a4-a76e-afd7ff53bd95
 # ╟─fafa619c-8187-4ffe-a6ec-994957dfb7d4
 # ╠═97293ad9-4ef1-46ec-ba4c-ea593a66d449
 # ╟─b60af232-58db-488b-b48e-baf6cd412d15
 # ╠═ecb988c8-844b-4a69-9870-613398238f65
+# ╠═0ba44efd-637e-4d23-8236-ffd3207f549c
 # ╠═0fa2bbcd-0b9e-4f79-8679-0e7d698d0068
 # ╟─efca9de3-e1f8-47de-8c7f-47f9f6b72ba9
 # ╠═a49117d2-562f-4af2-be5e-9f56423fe9c0
@@ -1868,6 +2261,7 @@ version = "0.9.1+5"
 # ╟─09bfe3f2-3a07-4701-a169-76d6b12490ba
 # ╟─b3c916f1-fed1-4ce7-a0cc-84b16877dcb3
 # ╠═e23d4c2f-620f-4fc4-b56a-0a285639e4ea
+# ╠═be0d4809-3b6a-4985-bb2c-117c14bd31bb
 # ╟─a16e058e-728e-4a24-a21a-aaafb5a6c183
 # ╟─a07694f7-bfcb-4a0e-87a4-7d5fddeeb5c8
 # ╠═d8669c2a-e38b-44f7-aeec-7920dc5abf1c
@@ -1883,5 +2277,11 @@ version = "0.9.1+5"
 # ╠═8d5baceb-f1e3-451a-92d5-cfabebaea4e7
 # ╠═a1cd331f-2d70-4802-8d76-7038268da1e7
 # ╠═b4edcf02-66f9-4ff7-a168-ea3100e5a5c6
+# ╠═28449291-d39e-4fae-bb16-7faacd8f9da0
+# ╠═cfdeb877-0ffa-4bc6-8d28-0478734f593e
+# ╠═4aeea9c5-5ffd-465f-8a11-65d2feba1286
+# ╠═04cd450c-d04d-41a8-9e3e-add8c407a9b8
+# ╠═3470328c-77bc-4dfd-952c-51346bb743c5
+# ╠═9e27690c-0557-468b-a754-ba051c0e581c
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
