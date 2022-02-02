@@ -454,18 +454,18 @@ begin
 	fall_cd8_dfs = readlog(fall_tune_cd8_pth, 0:9)
 	
 	fall_ep3_dfs = readlog(fall_tune_ep3_pth, 0:9)
-	fall_ep10_dfs = nothing #readlog(fall_tune_ep10_pth, 0:9)
+	fall_ep10_dfs = readlog(fall_tune_ep10_pth, 0:9)
 	
-	fall_int10_dfs = nothing #readlog(fall_tune_int10_pth, 0:9)
+	fall_int10_dfs = readlog(fall_tune_int10_pth, 0:9)
 	fall_int100_dfs = readlog(fall_tune_int100_pth, 0:9)
 	
 	fall_ppg512_dfs = readlog(fall_tune_ppg512_pth, 0:9)
-	fall_ppg1000_dfs = nothing #readlog(fall_tune_ppg1000_pth, 0:9)
+	fall_ppg1000_dfs = readlog(fall_tune_ppg1000_pth, 0:9)
 
-	fall_lr01_dfs = nothing #readlog(fall_tune_lr01_pth, 0:9)
+	fall_lr01_dfs = readlog(fall_tune_lr01_pth, 0:9)
 	fall_lr0001_dfs = readlog(fall_tune_lr0001_pth, 0:9)
 
-	fall_sigma02_dfs = nothing #readlog(fall_tune_sigma02_pth, 0:9)
+	fall_sigma02_dfs = readlog(fall_tune_sigma02_pth, 0:9)
 	fall_sigma0002_dfs = readlog(fall_tune_sigma0002_pth, 0:9)
 	
 	fall_tune = TuneRun(
@@ -531,7 +531,7 @@ begin
 	fall_ns_dfs = readlog(fall_ns_path, 0:9, missing_gentime=true)
 	fall_25node_dfs = readlog(fall_25_node_path, 0:9)
 	fall_10node_dfs = readlog(fall_10_node_path, 0:9)
-	# fall_5node_dfs = readlog(fall_5_node_path, 0:4)
+	fall_5node_dfs = readlog(fall_5_node_path, 0:1)
 	fall_single_df = readlog(fall_single_path, 0:1)
 	
 	all_fall_dfs = vcat(fall_dfs, fall_10node_dfs, fall_25node_dfs)
@@ -1076,6 +1076,9 @@ plot_tune(maze_tune, "Ant Maze:", "imgs/maze")
 # ╔═╡ 868412e5-f725-415b-a7ab-d6bed0e15b13
 plot_tune(push_tune, "Ant Push:", "imgs/push")
 
+# ╔═╡ 765a2c92-5869-47b8-8e1e-0cc2448fe9bd
+plot_tune(fall_tune, "Ant Fall:", "imgs/fall")
+
 # ╔═╡ fbb132aa-4f45-4f22-9339-25511aaa840b
 md"# Scratch"
 
@@ -1134,7 +1137,7 @@ end
 
 # ╔═╡ 25e2244a-c64d-427c-8930-0aca2d972704
 begin
-	dfs = fall_pt_dfs
+	dfs = fall_tune.ppg1000
 	trs = [maximum(df[!, TR]) for df in dfs]
 
 	mean(trs), 
@@ -2251,10 +2254,10 @@ version = "0.9.1+5"
 # ╟─27ea31d5-52ab-4186-8859-48e912abbe07
 # ╟─1341a522-35b1-4d12-acc5-5455cff02992
 # ╟─a28bbacf-5fa1-4a60-9ac5-66ca96dd0765
-# ╟─111b2a74-d0df-4c96-9dc7-c42310c4cb6c
+# ╠═111b2a74-d0df-4c96-9dc7-c42310c4cb6c
 # ╟─4bab0152-d53f-4bb9-a38a-49930797c632
 # ╟─ec291a04-df1a-4b4a-89e1-6e15d5c6b8d2
-# ╟─9f9e14fe-8568-48c2-9106-4e265bc284d8
+# ╠═9f9e14fe-8568-48c2-9106-4e265bc284d8
 # ╟─5aa5ddd3-e896-47e7-bdd1-effda634168e
 # ╟─00f265ae-6f4e-401b-9e36-2114489f23d9
 # ╟─bed86641-3ef4-48f9-b27b-b7a98da0d2eb
@@ -2307,6 +2310,7 @@ version = "0.9.1+5"
 # ╠═97293ad9-4ef1-46ec-ba4c-ea593a66d449
 # ╠═e23d4c2f-620f-4fc4-b56a-0a285639e4ea
 # ╠═868412e5-f725-415b-a7ab-d6bed0e15b13
+# ╠═765a2c92-5869-47b8-8e1e-0cc2448fe9bd
 # ╟─fbb132aa-4f45-4f22-9339-25511aaa840b
 # ╠═be0d4809-3b6a-4985-bb2c-117c14bd31bb
 # ╠═8d5baceb-f1e3-451a-92d5-cfabebaea4e7
